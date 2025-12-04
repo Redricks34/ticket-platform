@@ -248,6 +248,10 @@ body {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
+.ticket-card.priority-РЅРµ-РѕРїСЂРµРґРµР»С‘РЅ {
+    border-left-color: #94a3b8;
+}
+
 .ticket-card.priority-РЅРёР·РєРёР№ {
     border-left-color: #10b981;
 }
@@ -784,6 +788,16 @@ body {
     border-radius: 20px;
     font-size: 0.8rem;
     font-weight: 500;
+    min-width: 85px;
+    text-align: center;
+}
+
+.priority-badge.priority-РЅРµ-РѕРїСЂРµРґРµР»С‘РЅ {
+    background: #f1f5f9;
+    color: #64748b;
+    font-size: 0.75rem;
+    padding: 0.3rem 0.9rem;
+    min-width: 95px;
 }
 
 .priority-badge.priority-РЅРёР·РєРёР№ {
@@ -919,7 +933,7 @@ body {
     gap: 0.25rem;
 }
 
-/* Стили для раздела профиля */
+/* пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ */
 .profile-container {
     max-width: 800px;
     margin: 0 auto;
