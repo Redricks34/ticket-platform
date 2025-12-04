@@ -14,46 +14,6 @@ let isSupportUser = false;
 let currentTicketId = null;
 let messagesSocket = null;
 
-// Универсальная функция для обновления всех открытых чатов
-async function refreshAllChatsForTicket(ticketId) {
-    console.log('🔄 Обновляем все чаты для тикета:', ticketId, 'currentTicketId:', currentTicketId);
-    
-    // Обновляем пользовательский чат, если он открыт (ticketModal с классом active)
-    const userChatModal = document.getElementById('ticketModal');
-    console.log('👤 Пользовательский модал:', userChatModal ? 'найден' : 'не найден', 
-                'active:', userChatModal ? userChatModal.classList.contains('active') : 'n/a',
-                'ticketId match:', currentTicketId === ticketId);
-    
-    if (userChatModal && userChatModal.classList.contains('active') && currentTicketId === ticketId) {
-        console.log('✅ Обновляем пользовательский чат...');
-        loadUserTickets(); // Обновляем список тикетов
-        loadUserChatMessages(ticketId); // Обновляем сообщения
-    }
-    
-    // Обновляем чат поддержки, если он открыт (supportTicketModal со style.display !== 'none')
-    const supportChatModal = document.getElementById('supportTicketModal');
-    console.log('🔧 Модал поддержки:', supportChatModal ? 'найден' : 'не найден',
-                'display:', supportChatModal ? supportChatModal.style.display : 'n/a',
-                'ticketId match:', currentTicketId === ticketId);
-    
-    if (supportChatModal && supportChatModal.style.display === 'block' && currentTicketId === ticketId) {
-        console.log('✅ Обновляем чат поддержки...');
-        loadUnassignedTickets(); // Обновляем списки тикетов
-        loadAssignedTickets();
-        // Не перезагружаем весь модал, чтобы не потерять позицию скролла
-        // Вместо этого обновляем только сообщения
-        try {
-            const messagesResponse = await authorizedFetch(`${API_BASE_URL}/tickets/${ticketId}/messages`);
-            if (messagesResponse.ok) {
-                const messages = await messagesResponse.json();
-                renderChatMessages(messages);
-            }
-        } catch (error) {
-            console.error('Ошибка обновления сообщений поддержки:', error);
-        }
-    }
-}
-
 // Функция для авторизованных запросов
 function getAuthHeaders() {
     return {
@@ -920,10 +880,11 @@ function setupUserChatEventListeners(ticketId) {
             // Очищаем поле ввода
             chatInput.value = '';
             
-            // Универсальное обновление: обновляем ВСЕ открытые чаты для этого тикета
+            // Простое обновление: перезагружаем данные через полсекунды
             setTimeout(() => {
-                console.log('Обновляем все чаты после отправки сообщения пользователем для тикета:', ticketId);
-                refreshAllChatsForTicket(ticketId);
+                console.log('Обновляем данные после отправки сообщения...');
+                loadUserTickets(); // Обновляем список тикетов (включая счетчики)
+                loadUserChatMessages(ticketId); // Обновляем чат для получения актуальных данных
             }, 500);
             
         } catch (error) {
@@ -1460,10 +1421,16 @@ function setupChatEventListeners() {
             // Очищаем поле ввода
             chatInput.value = '';
             
-            // Универсальное обновление: обновляем ВСЕ открытые чаты для этого тикета
+            // Простое обновление: перезагружаем данные через полсекунды
             setTimeout(() => {
-                console.log('Обновляем все чаты после отправки сообщения поддержкой для тикета:', currentTicketId);
-                refreshAllChatsForTicket(currentTicketId);
+                console.log('Обновляем данные после отправки сообщения поддержки...');
+                loadUnassignedTickets(); // Обновляем список неназначенных тикетов
+                loadAssignedTickets(); // Обновляем список назначенных тикетов
+                
+                // Обновляем чат, перезагружая весь модальный диалог
+                if (currentTicketId) {
+                    openSupportTicketModal(currentTicketId);
+                }
             }, 500);
             
         } catch (error) {
