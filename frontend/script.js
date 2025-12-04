@@ -284,6 +284,8 @@ function switchTab(tabName) {
     // Загружаем данные в зависимости от вкладки
     if (tabName === 'home') {
         loadUserTickets();
+    } else if (tabName === 'create') {
+        prefillTicketForm();
     } else if (tabName === 'profile') {
         loadProfileData();
     }
@@ -404,6 +406,26 @@ function renderEmptyState() {
     `;
 }
 
+// Автозаполнение формы создания тикета
+function prefillTicketForm() {
+    if (!currentUser) return;
+    
+    const nameField = document.getElementById('reporterName');
+    const emailField = document.getElementById('reporterEmail');
+    
+    if (nameField && currentUser.full_name) {
+        nameField.value = currentUser.full_name;
+        nameField.setAttribute('readonly', true);
+        nameField.style.backgroundColor = '#f8f9fa';
+    }
+    
+    if (emailField && currentUser.email) {
+        emailField.value = currentUser.email;
+        emailField.setAttribute('readonly', true);
+        emailField.style.backgroundColor = '#f8f9fa';
+    }
+}
+
 // Создание тикета
 async function handleTicketSubmit(e) {
     e.preventDefault();
@@ -426,7 +448,7 @@ async function handleTicketSubmit(e) {
 
         const response = await authorizedFetch(`${API_BASE_URL}/tickets/`, {
             method: 'POST',
-            body: JSON.stringify(ticketData)
+            body: JSON.stringify(formData)
         });
 
         if (!response.ok) {
@@ -458,7 +480,13 @@ async function handleTicketSubmit(e) {
 
 // Сброс формы
 function resetCreateForm() {
-    document.getElementById('createTicketForm').reset();
+    // Очищаем только редактируемые поля
+    document.getElementById('ticketTitle').value = '';
+    document.getElementById('ticketCategory').value = '';
+    document.getElementById('ticketDescription').value = '';
+    
+    // Имя и email не очищаем - они автозаполняются
+    // prefillTicketForm(); // Заново заполним поля пользователя
 }
 
 // Применение фильтров
