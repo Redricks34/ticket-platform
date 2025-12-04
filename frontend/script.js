@@ -16,23 +16,41 @@ let messagesSocket = null;
 
 // Универсальная функция для обновления всех открытых чатов
 async function refreshAllChatsForTicket(ticketId) {
-    console.log('Обновляем все чаты для тикета:', ticketId);
+    console.log('🔄 Обновляем все чаты для тикета:', ticketId, 'currentTicketId:', currentTicketId);
     
-    // Обновляем пользовательский чат, если он открыт
-    const userChatModal = document.getElementById('userTicketModal');
-    if (userChatModal && userChatModal.style.display === 'block' && currentTicketId === ticketId) {
-        console.log('Обновляем пользовательский чат...');
+    // Обновляем пользовательский чат, если он открыт (ticketModal с классом active)
+    const userChatModal = document.getElementById('ticketModal');
+    console.log('👤 Пользовательский модал:', userChatModal ? 'найден' : 'не найден', 
+                'active:', userChatModal ? userChatModal.classList.contains('active') : 'n/a',
+                'ticketId match:', currentTicketId === ticketId);
+    
+    if (userChatModal && userChatModal.classList.contains('active') && currentTicketId === ticketId) {
+        console.log('✅ Обновляем пользовательский чат...');
         loadUserTickets(); // Обновляем список тикетов
         loadUserChatMessages(ticketId); // Обновляем сообщения
     }
     
-    // Обновляем чат поддержки, если он открыт  
+    // Обновляем чат поддержки, если он открыт (supportTicketModal со style.display !== 'none')
     const supportChatModal = document.getElementById('supportTicketModal');
+    console.log('🔧 Модал поддержки:', supportChatModal ? 'найден' : 'не найден',
+                'display:', supportChatModal ? supportChatModal.style.display : 'n/a',
+                'ticketId match:', currentTicketId === ticketId);
+    
     if (supportChatModal && supportChatModal.style.display === 'block' && currentTicketId === ticketId) {
-        console.log('Обновляем чат поддержки...');
+        console.log('✅ Обновляем чат поддержки...');
         loadUnassignedTickets(); // Обновляем списки тикетов
         loadAssignedTickets();
-        openSupportTicketModal(ticketId); // Полная перезагрузка модального окна
+        // Не перезагружаем весь модал, чтобы не потерять позицию скролла
+        // Вместо этого обновляем только сообщения
+        try {
+            const messagesResponse = await authorizedFetch(`${API_BASE_URL}/tickets/${ticketId}/messages`);
+            if (messagesResponse.ok) {
+                const messages = await messagesResponse.json();
+                renderChatMessages(messages);
+            }
+        } catch (error) {
+            console.error('Ошибка обновления сообщений поддержки:', error);
+        }
     }
 }
 
@@ -904,7 +922,7 @@ function setupUserChatEventListeners(ticketId) {
             
             // Универсальное обновление: обновляем ВСЕ открытые чаты для этого тикета
             setTimeout(() => {
-                console.log('Обновляем все чаты после отправки сообщения пользователем...');
+                console.log('Обновляем все чаты после отправки сообщения пользователем для тикета:', ticketId);
                 refreshAllChatsForTicket(ticketId);
             }, 500);
             
@@ -1444,7 +1462,7 @@ function setupChatEventListeners() {
             
             // Универсальное обновление: обновляем ВСЕ открытые чаты для этого тикета
             setTimeout(() => {
-                console.log('Обновляем все чаты после отправки сообщения поддержкой...');
+                console.log('Обновляем все чаты после отправки сообщения поддержкой для тикета:', currentTicketId);
                 refreshAllChatsForTicket(currentTicketId);
             }, 500);
             
