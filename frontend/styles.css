@@ -284,6 +284,21 @@ body {
     border-radius: 4px;
 }
 
+.message-count {
+    font-size: 0.8rem;
+    color: #059669;
+    background: #ecfdf5;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-weight: 600;
+    animation: pulse 1s ease-in-out;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
 .ticket-title {
     font-size: 1.1rem;
     font-weight: 600;
@@ -679,11 +694,11 @@ body.modal-open {
 }
 
 .chat-message.support {
-    align-items: flex-end;
+    align-items: flex-start;
 }
 
 .chat-message.user {
-    align-items: flex-start;
+    align-items: flex-end;
 }
 
 .message-bubble {
@@ -694,15 +709,15 @@ body.modal-open {
 }
 
 .chat-message.support .message-bubble {
-    background: #3b82f6;
-    color: white;
-    border-bottom-right-radius: 6px;
-}
-
-.chat-message.user .message-bubble {
     background: #e5e7eb;
     color: #1f2937;
     border-bottom-left-radius: 6px;
+}
+
+.chat-message.user .message-bubble {
+    background: #3b82f6;
+    color: white;
+    border-bottom-right-radius: 6px;
 }
 
 .message-meta {
@@ -748,6 +763,38 @@ body.modal-open {
     align-items: center;
     justify-content: center;
     padding: 0;
+}
+
+/* Стили для пользовательского чата */
+.ticket-chat {
+    margin-top: 2rem;
+    border-top: 1px solid #e2e8f0;
+    padding-top: 2rem;
+}
+
+.ticket-chat h4 {
+    color: #1e293b;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.ticket-chat h4::before {
+    content: '💬';
+    font-size: 1.2em;
+}
+
+/* Удалены дублирующие стили user-chat - теперь используются стандартные .chat-* классы */
+
+.loading-messages, .error-message {
+    text-align: center;
+    padding: 2rem;
+    color: #64748b;
+}
+
+.error-message {
+    color: #dc2626;
 }
 
 .ticket-details h4 {
@@ -1356,5 +1403,69 @@ body.modal-open {
     
     .ticket-controls .btn {
         width: 100%;
+    }
+}
+
+/* Новая структура модального окна с чатом справа */
+.ticket-modal-layout {
+    display: flex;
+    gap: 1.5rem;
+    min-height: 500px;
+}
+
+.ticket-info-section {
+    flex: 1;
+    min-width: 0;
+}
+
+.ticket-chat-section {
+    flex: 0 0 400px;
+    border-left: 1px solid #e5e7eb;
+    padding-left: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    height: 600px;
+}
+
+.chat-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.chat-header h4 {
+    margin: 0;
+    color: #374151;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.message-count-badge {
+    background: #3b82f6;
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+/* Адаптивность для мобильных устройств */
+@media (max-width: 768px) {
+    .ticket-modal-layout {
+        flex-direction: column;
+    }
+    
+    .ticket-chat-section {
+        flex: none;
+        border-left: none;
+        border-top: 1px solid #e5e7eb;
+        padding-left: 0;
+        padding-top: 1.5rem;
+        height: 400px;
     }
 }

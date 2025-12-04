@@ -14,6 +14,28 @@ let isSupportUser = false;
 let currentTicketId = null;
 let messagesSocket = null;
 
+// Универсальная функция для обновления всех открытых чатов
+async function refreshAllChatsForTicket(ticketId) {
+    console.log('Обновляем все чаты для тикета:', ticketId);
+    
+    // Обновляем пользовательский чат, если он открыт
+    const userChatModal = document.getElementById('userTicketModal');
+    if (userChatModal && userChatModal.style.display === 'block' && currentTicketId === ticketId) {
+        console.log('Обновляем пользовательский чат...');
+        loadUserTickets(); // Обновляем список тикетов
+        loadUserChatMessages(ticketId); // Обновляем сообщения
+    }
+    
+    // Обновляем чат поддержки, если он открыт  
+    const supportChatModal = document.getElementById('supportTicketModal');
+    if (supportChatModal && supportChatModal.style.display === 'block' && currentTicketId === ticketId) {
+        console.log('Обновляем чат поддержки...');
+        loadUnassignedTickets(); // Обновляем списки тикетов
+        loadAssignedTickets();
+        openSupportTicketModal(ticketId); // Полная перезагрузка модального окна
+    }
+}
+
 // Функция для авторизованных запросов
 function getAuthHeaders() {
     return {
@@ -192,7 +214,7 @@ async function loadUserStats() {
         const data = await response.json();
         
         const tickets = data.tickets || [];
-        const openTickets = tickets.filter(t => t.status === 'открыт' || t.status === 'в_процессе').length;
+        const openTickets = tickets.filter(t => t.status === 'открыт' || t.status === 'в работе' || t.status === 'в_процессе').length;
         const resolvedTickets = tickets.filter(t => t.status === 'решен' || t.status === 'закрыт').length;
         
         document.getElementById('user-tickets-count').textContent = tickets.length;
@@ -435,9 +457,10 @@ function renderTickets(tickets) {
     }
 
     container.innerHTML = tickets.map(ticket => `
-        <div class="ticket-card priority-${ticket.priority}" onclick="openTicketModal('${ticket.id}')">
+        <div class="ticket-card priority-${ticket.priority}" data-ticket-id="${ticket.id}" onclick="openTicketModal('${ticket.id}')">
             <div class="ticket-header">
                 <span class="ticket-id">#${ticket.id.substring(0, 8)}</span>
+                ${(ticket.comments_count && ticket.comments_count > 0) ? `<span class="message-count">📨 ${ticket.comments_count}</span>` : '<span class="message-count" style="display:none;"></span>'}
             </div>
             
             <h3 class="ticket-title">${escapeHtml(ticket.title)}</h3>
@@ -468,8 +491,8 @@ function renderTickets(tickets) {
                 </span>
                 <span class="ticket-comments">
                     <i class="fas fa-comment"></i>
-                    ${ticket.comments_count} комм.
-                    ${ticket.comments_count > 0 ? '<span class="new-comment-indicator">есть ответ</span>' : ''}
+                    ${ticket.comments_count || 0} комм.
+                    ${(ticket.comments_count && ticket.comments_count > 0) ? '<span class="new-comment-indicator">есть ответ</span>' : ''}
                 </span>
             </div>
         </div>
@@ -481,7 +504,7 @@ function updateStats(tickets) {
     const stats = {
         total: tickets.length,
         open: tickets.filter(t => t.status === 'открыт').length,
-        progress: tickets.filter(t => t.status === 'в_процессе').length,
+        progress: tickets.filter(t => t.status === 'в работе' || t.status === 'в_процессе').length,
         resolved: tickets.filter(t => t.status === 'решен' || t.status === 'закрыт').length
     };
 
@@ -682,86 +705,227 @@ function renderTicketModal(ticket) {
     
     const modalBody = document.getElementById('modalTicketBody');
     modalBody.innerHTML = `
-        <div class="ticket-full">
-            <div class="ticket-info">
-                <div class="info-row">
-                    <strong>ID:</strong> #${ticket.id.substring(0, 8)}
+        <div class="ticket-modal-layout">
+            <div class="ticket-info-section">
+                <div class="ticket-info">
+                    <div class="info-row">
+                        <strong>ID:</strong> #${ticket.id.substring(0, 8)}
+                    </div>
+                    <div class="info-row">
+                        <strong>Статус:</strong> 
+                        <span class="ticket-status status-${ticket.status}">${getStatusText(ticket.status)}</span>
+                    </div>
+                    <div class="info-row">
+                        <strong>Категория:</strong> ${getCategoryText(ticket.category)}
+                    </div>
+                    <div class="info-row">
+                        <strong>Приоритет:</strong> 
+                        <span class="priority-badge priority-${ticket.priority}">${getPriorityText(ticket.priority)}</span>
+                    </div>
+                    <div class="info-row">
+                        <strong>Автор:</strong> ${escapeHtml(ticket.reporter_name)} (${escapeHtml(ticket.reporter_email)})
+                    </div>
+                    <div class="info-row">
+                        <strong>Создан:</strong> ${formatDateTime(ticket.created_at)}
+                    </div>
+                    ${ticket.updated_at !== ticket.created_at ? `
+                    <div class="info-row">
+                        <strong>Обновлен:</strong> ${formatDateTime(ticket.updated_at)}
+                    </div>
+                    ` : ''}
                 </div>
-                <div class="info-row">
-                    <strong>Статус:</strong> 
-                    <span class="ticket-status status-${ticket.status}">${getStatusText(ticket.status)}</span>
-                </div>
-                <div class="info-row">
-                    <strong>Категория:</strong> ${getCategoryText(ticket.category)}
-                </div>
-                <div class="info-row">
-                    <strong>Приоритет:</strong> 
-                    <span class="priority-badge priority-${ticket.priority}">${getPriorityText(ticket.priority)}</span>
-                </div>
-                <div class="info-row">
-                    <strong>Автор:</strong> ${escapeHtml(ticket.reporter_name)} (${escapeHtml(ticket.reporter_email)})
-                </div>
-                <div class="info-row">
-                    <strong>Создан:</strong> ${formatDateTime(ticket.created_at)}
-                </div>
-                ${ticket.updated_at !== ticket.created_at ? `
-                <div class="info-row">
-                    <strong>Обновлен:</strong> ${formatDateTime(ticket.updated_at)}
-                </div>
-                ` : ''}
-            </div>
-            
-            <div class="ticket-content">
-                <h4>Описание проблемы:</h4>
-                <div class="description-content">
-                    ${escapeHtml(ticket.description).replace(/\n/g, '<br>')}
-                </div>
-            </div>
-
-            ${ticket.comments_count > 0 ? `
-            <div class="ticket-comments">
-                <h4>Комментарии службы поддержки:</h4>
-                <div id="commentsContainer">
-                    <div class="loading-comments">
-                        <i class="fas fa-spinner fa-spin"></i> Загрузка комментариев...
+                
+                <div class="ticket-content">
+                    <h4>Описание проблемы:</h4>
+                    <div class="description-content">
+                        ${escapeHtml(ticket.description).replace(/\n/g, '<br>')}
                     </div>
                 </div>
             </div>
-            ` : `
-            <div class="no-comments">
-                <i class="fas fa-comment-slash"></i>
-                <p>Пока нет комментариев от службы поддержки</p>
+
+            ${(ticket.comments_count && ticket.comments_count > 0) ? `
+            <div class="ticket-chat-section">
+                <div class="chat-header">
+                    <h4><i class="fas fa-comments"></i> Переписка с поддержкой</h4>
+                    <span class="message-count-badge">${ticket.comments_count} сообщ.</span>
+                </div>
+                <div class="chat-messages" id="userChatMessages">
+                    <div class="loading-messages">
+                        <i class="fas fa-spinner fa-spin"></i> Загрузка сообщений...
+                    </div>
+                </div>
+                <div class="chat-input-container">
+                    <div class="chat-input-wrapper">
+                        <textarea 
+                            id="userChatInput" 
+                            placeholder="Напишите ваше сообщение..."
+                            rows="2"
+                            maxlength="1000"
+                        ></textarea>
+                        <button id="userSendMessage" class="btn btn-primary">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
             </div>
-            `}
+            ` : ''}
         </div>
     `;
 
-    // Загружаем комментарии, если они есть
-    if (ticket.comments_count > 0) {
-        loadTicketComments(ticket.id);
+    // Загружаем сообщения и настраиваем чат, если есть сообщения
+    if (ticket.comments_count && ticket.comments_count > 0) {
+        console.log('Настраиваем чат для тикета с ID:', ticket.id, 'количество сообщений:', ticket.comments_count);
+        loadUserChatMessages(ticket.id);
+        setupUserChatEventListeners(ticket.id);
+    } else {
+        console.log('Чат не отображается для тикета:', ticket.id, 'количество сообщений:', ticket.comments_count || 0);
     }
 }
 
-// Загрузка комментариев (симуляция, так как в API нет отдельного endpoint)
-async function loadTicketComments(ticketId) {
-    // В реальном приложении здесь был бы отдельный endpoint для комментариев
-    // Пока симулируем комментарии
-    setTimeout(() => {
-        const container = document.getElementById('commentsContainer');
+// Загрузка сообщений для пользовательского чата
+async function loadUserChatMessages(ticketId) {
+    console.log('Загружаем сообщения для тикета:', ticketId);
+    try {
+        const response = await authorizedFetch(`${API_BASE_URL}/tickets/${ticketId}/messages`);
+        if (!response.ok) {
+            throw new Error('Ошибка загрузки сообщений');
+        }
+        
+        const messages = await response.json();
+        renderUserChatMessages(messages);
+        
+    } catch (error) {
+        console.error('Ошибка загрузки сообщений:', error);
+        const container = document.getElementById('userChatMessages');
         if (container) {
             container.innerHTML = `
-                <div class="comment">
-                    <div class="comment-header">
-                        <strong>Служба поддержки</strong>
-                        <span class="comment-date">${formatDateTime(new Date())}</span>
-                    </div>
-                    <div class="comment-content">
-                        Спасибо за обращение! Мы рассмотрим вашу заявку в ближайшее время.
-                    </div>
+                <div class="error-message">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    Ошибка загрузки сообщений
                 </div>
             `;
         }
-    }, 1000);
+    }
+}
+
+// Отображение сообщений в пользовательском чате
+function renderUserChatMessages(messages) {
+    const container = document.getElementById('userChatMessages');
+    if (!container) return;
+    
+    if (messages.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+    
+    container.innerHTML = messages.map(message => `
+        <div class="chat-message ${message.is_support ? 'support' : 'user'}">
+            <div class="message-bubble">
+                ${escapeHtml(message.content)}
+            </div>
+            <div class="message-meta">
+                ${message.is_support ? 'Поддержка' : 'Вы'} • ${formatDateTime(message.created_at)}
+            </div>
+        </div>
+    `).join('');
+    
+    // Прокручиваем к последнему сообщению
+    container.scrollTop = container.scrollHeight;
+}
+
+// Настройка обработчиков событий для пользовательского чата
+function setupUserChatEventListeners(ticketId) {
+    const sendBtn = document.getElementById('userSendMessage');
+    const chatInput = document.getElementById('userChatInput');
+    
+    const sendUserMessage = async () => {
+        const content = chatInput.value ? chatInput.value.trim() : '';
+        if (!content || content.length === 0) {
+            console.log('Пустое сообщение, отменяем отправку');
+            return;
+        }
+        
+        try {
+            console.log('Отправляем сообщение пользователя для тикета:', ticketId);
+            console.log('Содержимое сообщения:', content);
+            console.log('Длина сообщения:', content.length);
+            
+            if (!content || content.trim().length === 0) {
+                console.error('Пустое сообщение!');
+                return;
+            }
+            
+            const messageData = {
+                content: content.trim(),
+                author_email: userEmail,
+                author_name: currentUser?.full_name || 'Пользователь'
+            };
+            console.log('Данные сообщения:', messageData);
+            
+            console.log('Отправляем на:', `${API_BASE_URL}/tickets/${ticketId}/messages`);
+            
+            const response = await authorizedFetch(`${API_BASE_URL}/tickets/${ticketId}/messages`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(messageData)
+            });
+            
+            console.log('Ответ сервера:', response.status, response.statusText);
+            
+            if (!response.ok) {
+                const errorData = await response.text();
+                console.error('Ошибка ответа сервера:', errorData);
+                throw new Error(`Ошибка отправки сообщения: ${response.status} ${response.statusText}`);
+            }
+            
+            const newMessage = await response.json();
+            
+            // Добавляем сообщение в чат
+            const chatContainer = document.getElementById('userChatMessages');
+            const currentTime = new Date().toISOString();
+            const messageHTML = `
+                <div class="chat-message user">
+                    <div class="message-bubble">
+                        ${escapeHtml(newMessage.content)}
+                    </div>
+                    <div class="message-meta">
+                        Вы • ${formatDateTime(newMessage.created_at || currentTime)}
+                    </div>
+                </div>
+            `;
+            
+            chatContainer.insertAdjacentHTML('beforeend', messageHTML);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            
+            // Очищаем поле ввода
+            chatInput.value = '';
+            
+            // Универсальное обновление: обновляем ВСЕ открытые чаты для этого тикета
+            setTimeout(() => {
+                console.log('Обновляем все чаты после отправки сообщения пользователем...');
+                refreshAllChatsForTicket(ticketId);
+            }, 500);
+            
+        } catch (error) {
+            console.error('Ошибка отправки сообщения:', error);
+            showNotification('Ошибка отправки сообщения', 'error');
+        }
+    };
+    
+    if (sendBtn) {
+        sendBtn.onclick = sendUserMessage;
+    }
+    
+    if (chatInput) {
+        chatInput.onkeypress = (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendUserMessage();
+            }
+        };
+    }
 }
 
 function closeModal() {
@@ -818,7 +982,30 @@ function handleWebSocketNotification(notification) {
                 message = `Тикет "${notification.ticket.title}" обновлен`;
                 break;
             case 'comment_added':
-                message = `Новый комментарий к тикету "${notification.ticket.title}"`;
+            case 'message_added':
+                message = `Новый комментарий к тикету "${notification.ticket ? notification.ticket.title : 'Тикет'}"`;
+                
+                // Определяем ID тикета
+                const ticketIdFromNotification = notification.ticket_id || (notification.ticket && (notification.ticket._id || notification.ticket.id));
+                
+                if (ticketIdFromNotification) {
+                    // Обновляем счётчик сообщений
+                    const newCount = notification.ticket?.comments_count || (notification.message ? 1 : 0);
+                    updateTicketMessageCount(ticketIdFromNotification, newCount);
+                    
+                    // Если чат открыт для этого тикета, обновляем сообщения
+                    if (currentTicketId === ticketIdFromNotification) {
+                        console.log('Обновляем чат для тикета:', ticketIdFromNotification);
+                        
+                        // Если есть новое сообщение в уведомлении, добавляем его напрямую
+                        if (notification.message) {
+                            addMessageToChat(notification.message);
+                        } else {
+                            // Иначе перезагружаем все сообщения
+                            loadUserChatMessages(ticketIdFromNotification);
+                        }
+                    }
+                }
                 break;
         }
         
@@ -830,6 +1017,92 @@ function handleWebSocketNotification(notification) {
                 loadUserTickets();
             }
         }
+    }
+}
+
+// Функция для обновления счётчика сообщений в реальном времени
+function updateTicketMessageCount(ticketId, newCount) {
+    console.log('Обновляем счётчик для тикета:', ticketId, 'новое количество:', newCount);
+    
+    // Ищем карточку тикета по ID
+    const ticketCard = document.querySelector(`[data-ticket-id="${ticketId}"]`);
+    if (!ticketCard) {
+        console.log('Карточка тикета не найдена:', ticketId);
+        return;
+    }
+    
+    // Находим элемент со счётчиком сообщений в header
+    const messageCountElement = ticketCard.querySelector('.message-count');
+    if (messageCountElement) {
+        // Обновляем счётчик в header карточки
+        if (newCount > 0) {
+            messageCountElement.textContent = `📨 ${newCount}`;
+            messageCountElement.style.display = 'inline';
+        } else {
+            messageCountElement.style.display = 'none';
+        }
+    }
+    
+    // Также обновляем текст комментариев в footer карточки
+    const commentsElement = ticketCard.querySelector('.ticket-comments');
+    if (commentsElement) {
+        const commentIcon = '<i class="fas fa-comment"></i>';
+        const indicatorHTML = newCount > 0 ? '<span class="new-comment-indicator">есть ответ</span>' : '';
+        commentsElement.innerHTML = `${commentIcon} ${newCount || 0} комм. ${indicatorHTML}`;
+    }
+}
+
+// Функция для добавления одного сообщения в чат
+function addMessageToChat(message) {
+    const container = document.getElementById('userChatMessages');
+    if (!container) return;
+    
+    const messageHTML = `
+        <div class="chat-message ${message.is_support ? 'support' : 'user'}">
+            <div class="message-bubble">
+                ${escapeHtml(message.content)}
+            </div>
+            <div class="message-meta">
+                ${message.is_support ? 'Поддержка' : 'Вы'} • ${formatDateTime(message.created_at)}
+            </div>
+        </div>
+    `;
+    
+    container.insertAdjacentHTML('beforeend', messageHTML);
+    container.scrollTop = container.scrollHeight;
+    
+    // Обновляем счетчик в header'е чата
+    const chatHeader = document.querySelector('.chat-header .message-count-badge');
+    if (chatHeader) {
+        const currentCount = parseInt(chatHeader.textContent.match(/\d+/)[0]) || 0;
+        chatHeader.textContent = `${currentCount + 1} сообщ.`;
+    }
+}
+
+// Функция для добавления одного сообщения в чат
+function addMessageToChat(message) {
+    const container = document.getElementById('userChatMessages');
+    if (!container) return;
+    
+    const messageHTML = `
+        <div class="chat-message ${message.is_support ? 'support' : 'user'}">
+            <div class="message-bubble">
+                ${escapeHtml(message.content)}
+            </div>
+            <div class="message-meta">
+                ${message.is_support ? 'Поддержка' : 'Вы'} • ${formatDateTime(message.created_at)}
+            </div>
+        </div>
+    `;
+    
+    container.insertAdjacentHTML('beforeend', messageHTML);
+    container.scrollTop = container.scrollHeight;
+    
+    // Обновляем счетчик в header'е чата
+    const chatHeader = document.querySelector('.chat-header .message-count-badge');
+    if (chatHeader) {
+        const currentCount = parseInt(chatHeader.textContent.match(/\d+/)?.[0]) || 0;
+        chatHeader.textContent = `${currentCount + 1} сообщ.`;
     }
 }
 
@@ -1168,6 +1441,12 @@ function setupChatEventListeners() {
             
             // Очищаем поле ввода
             chatInput.value = '';
+            
+            // Универсальное обновление: обновляем ВСЕ открытые чаты для этого тикета
+            setTimeout(() => {
+                console.log('Обновляем все чаты после отправки сообщения поддержкой...');
+                refreshAllChatsForTicket(currentTicketId);
+            }, 500);
             
         } catch (error) {
             console.error('Ошибка отправки сообщения:', error);

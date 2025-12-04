@@ -54,6 +54,11 @@ class TicketService:
         if not ticket:
             raise HTTPException(status_code=404, detail="Тикет не найден")
         
+        # Добавляем подсчёт сообщений из коллекции messages
+        messages_collection = get_messages_collection()
+        comments_count = await messages_collection.count_documents({"ticket_id": ticket_id})
+        ticket["comments_count_real"] = comments_count
+        
         return TicketService._ticket_to_response(ticket)
     
     @staticmethod
@@ -200,7 +205,7 @@ class TicketService:
             reporter_name=ticket["reporter_name"],
             assignee_id=ticket.get("assignee_id"),
             assignee_name=ticket.get("assignee_name"),
-            comments_count=len(ticket.get("comments", [])),
+            comments_count=ticket.get("comments_count_real", len(ticket.get("comments", []))),
             created_at=ticket["created_at"],
             updated_at=ticket["updated_at"],
             closed_at=ticket.get("closed_at")
