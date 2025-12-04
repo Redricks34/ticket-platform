@@ -406,8 +406,14 @@ async function loadUserTickets() {
 
         const data = await response.json();
         
-        renderTickets(data.tickets);
-        updateStats(data.tickets);
+        // Сортируем тикеты: сначала активные, потом закрытые
+        const sortedTickets = data.tickets.sort((a, b) => {
+            const statusOrder = { 'открыт': 1, 'в работе': 2, 'закрыт': 3 };
+            return (statusOrder[a.status] || 1) - (statusOrder[b.status] || 1);
+        });
+        
+        renderTickets(sortedTickets);
+        updateStats(sortedTickets);
         renderPagination(data);
         
     } catch (error) {
@@ -963,19 +969,33 @@ async function acceptTicket(ticketId) {
 }
 
 async function openSupportTicketModal(ticketId) {
+    console.log('Открываем модальное окно для тикета:', ticketId);
     currentTicketId = ticketId;
     
     try {
         // Загружаем детали тикета
         const ticketResponse = await authorizedFetch(`${API_BASE_URL}/tickets/${ticketId}`);
+        if (!ticketResponse.ok) {
+            throw new Error('Ошибка загрузки тикета');
+        }
         const ticket = await ticketResponse.json();
         
         // Загружаем сообщения
         const messagesResponse = await authorizedFetch(`${API_BASE_URL}/tickets/${ticketId}/messages`);
+        if (!messagesResponse.ok) {
+            throw new Error('Ошибка загрузки сообщений');
+        }
         const messages = await messagesResponse.json();
         
         renderSupportTicketModal(ticket, messages);
-        document.getElementById('supportTicketModal').classList.add('active');
+        
+        // Показываем модальное окно
+        const modal = document.getElementById('supportTicketModal');
+        if (modal) {
+            modal.style.display = 'block';
+            modal.classList.add('active');
+            console.log('Модальное окно открыто для тикета:', ticketId);
+        }
         
         // Отмечаем как прочитанные
         await authorizedFetch(`${API_BASE_URL}/support/tickets/${ticketId}/mark-read`, {
@@ -1438,13 +1458,29 @@ async function closeTicket(ticketId) {
         
         showNotification('Тикет успешно закрыт!', 'success');
         
-        // Закрываем модальное окно чата
-        document.getElementById('supportTicketModal').style.display = 'none';
-        document.getElementById('supportTicketModal').classList.remove('active');
-        
-        // Обновляем списки тикетов
+        // Обновляем списки тикетов перед закрытием модального окна
         await loadUnassignedTickets();
         await loadAssignedTickets();
+        
+        // Полностью очищаем и закрываем модальное окно
+        const modal = document.getElementById('supportTicketModal');
+        if (modal) {
+            // Очищаем содержимое
+            const chatMessages = document.getElementById('chatMessages');
+            if (chatMessages) chatMessages.innerHTML = '';
+            
+            const ticketDetails = document.getElementById('supportTicketDetails');
+            if (ticketDetails) ticketDetails.innerHTML = '';
+            
+            // Удаляем все классы и скрываем
+            modal.classList.remove('active');
+            modal.style.display = 'none';
+        }
+        
+        // Очищаем текущий тикет в самом конце
+        currentTicketId = null;
+        
+        console.log('Модальное окно закрыто, тикет:', ticketId, 'статус закрыт');
         
     } catch (error) {
         showNotification('Ошибка при закрытии тикета: ' + error.message, 'error');
@@ -1476,3 +1512,4 @@ function updateChatPriorityDisplay(newPriority) {
     
     console.log('Priority display updated to:', newPriority);
 }
+

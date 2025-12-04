@@ -10,7 +10,7 @@ from models import (
     TicketResponse, PaginatedResponse, Comment, CommentCreate,
     TicketStatus
 )
-from database import get_tickets_collection
+from database import get_tickets_collection, get_messages_collection
 from notifications import notification_service
 
 logger = logging.getLogger(__name__)
@@ -277,16 +277,54 @@ class TicketService:
     
     @staticmethod
     async def get_assigned_tickets(assignee_email: str, page: int = 1, page_size: int = 20) -> PaginatedResponse:
-        """Получить тикеты, назначенные конкретному сотруднику техподдержки."""
-        filters = TicketFilters(assignee_id=assignee_email)
-        return await TicketService.get_tickets(filters, page, page_size)
+        """Получить активные тикеты, назначенные конкретному сотруднику техподдержки (исключая закрытые)."""
+        collection = get_tickets_collection()
+        
+        # Фильтр для активных тикетов назначенных пользователю
+        query = {
+            "assignee_id": assignee_email,
+            "status": {"$ne": "закрыт"}  # Исключаем закрытые тикеты
+        }
+        
+        # Подсчитываем общее количество
+        total = await collection.count_documents(query)
+        
+        # Вычисляем пагинацию
+        skip = (page - 1) * page_size
+        total_pages = (total + page_size - 1) // page_size
+        
+        # Получаем тикеты
+        cursor = collection.find(query).sort("created_at", -1).skip(skip).limit(page_size)
+        tickets = []
+        
+        async for ticket_data in cursor:
+            ticket_data["_id"] = str(ticket_data["_id"])
+            ticket_data["id"] = ticket_data["_id"]
+            
+            # Подсчитываем количество комментариев
+            messages_collection = get_messages_collection()
+            comments_count = await messages_collection.count_documents({"ticket_id": ticket_data["id"]})
+            ticket_data["comments_count"] = comments_count
+            
+            tickets.append(TicketResponse(**ticket_data))
+        
+        return PaginatedResponse(
+            tickets=tickets,
+            total=total,
+            page=page,
+            page_size=page_size,
+            total_pages=total_pages
+        )
     
     @staticmethod
     async def get_unassigned_tickets(page: int = 1, page_size: int = 20) -> PaginatedResponse:
-        """Получить неназначенные тикеты для техподдержки."""
+        """Получить неназначенные активные тикеты для техподдержки (исключая закрытые)."""
         collection = get_tickets_collection()
         
-        query = {"assignee_id": {"$exists": False}}
+        query = {
+            "assignee_id": {"$exists": False},
+            "status": {"$ne": "закрыт"}  # Исключаем закрытые тикеты
+        }
         
         # Подсчитываем общее количество
         total = await collection.count_documents(query)
