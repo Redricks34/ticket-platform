@@ -184,11 +184,16 @@ class TicketService:
     @staticmethod
     def _ticket_to_response(ticket: Dict[str, Any]) -> TicketResponse:
         """Конвертировать тикет из базы данных в ответ API."""
+        # Преобразование старого статуса для обратной совместимости
+        status = ticket["status"]
+        if status == "в_процессе":
+            status = "в работе"
+        
         return TicketResponse(
             id=str(ticket["_id"]),
             title=ticket["title"],
             description=ticket["description"],
-            status=ticket["status"],
+            status=status,
             priority=ticket["priority"],
             category=ticket["category"],
             reporter_email=ticket["reporter_email"],
@@ -257,7 +262,7 @@ class TicketService:
         update_dict = {
             "assignee_id": assignee_email,  # Используем email как ID
             "assignee_name": assignee_name,
-            "status": "в_процессе",
+            "status": "в работе",
             "updated_at": datetime.utcnow()
         }
         
@@ -283,7 +288,7 @@ class TicketService:
         # Фильтр для активных тикетов назначенных пользователю
         query = {
             "assignee_id": assignee_email,
-            "status": {"$ne": "закрыт"}  # Исключаем закрытые тикеты
+            "status": {"$nin": ["закрыт", "решен"]}  # Исключаем закрытые и решенные тикеты
         }
         
         # Подсчитываем общее количество
@@ -300,6 +305,10 @@ class TicketService:
         async for ticket_data in cursor:
             ticket_data["_id"] = str(ticket_data["_id"])
             ticket_data["id"] = ticket_data["_id"]
+            
+            # Преобразование старого статуса для обратной совместимости
+            if ticket_data["status"] == "в_процессе":
+                ticket_data["status"] = "в работе"
             
             # Подсчитываем количество комментариев
             messages_collection = get_messages_collection()
@@ -323,7 +332,7 @@ class TicketService:
         
         query = {
             "assignee_id": {"$exists": False},
-            "status": {"$ne": "закрыт"}  # Исключаем закрытые тикеты
+            "status": {"$nin": ["закрыт", "решен"]}  # Исключаем закрытые и решенные тикеты
         }
         
         # Подсчитываем общее количество

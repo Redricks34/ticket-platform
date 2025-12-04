@@ -969,8 +969,9 @@ async function acceptTicket(ticketId) {
 }
 
 async function openSupportTicketModal(ticketId) {
-    console.log('Открываем модальное окно для тикета:', ticketId);
+    console.log('Открываем модальное окно для тикета:', ticketId, '(старый currentTicketId:', currentTicketId, ')');
     currentTicketId = ticketId;
+    console.log('currentTicketId обновлён на:', currentTicketId);
     
     try {
         // Загружаем детали тикета
@@ -1097,6 +1098,7 @@ function setupChatEventListeners() {
                 // Разблокируем прокрутку фона
                 document.body.classList.remove('modal-open');
             }
+            console.log('Модальное окно закрывается через крестик. currentTicketId:', currentTicketId, '→ null');
             currentTicketId = null;
             console.log('Модальное окно закрыто через крестик');
         };
@@ -1111,6 +1113,7 @@ function setupChatEventListeners() {
                 modal.style.display = 'none';
                 // Разблокируем прокрутку фона
                 document.body.classList.remove('modal-open');
+                console.log('Модальное окно закрывается по клику на фон. currentTicketId:', currentTicketId, '→ null');
                 currentTicketId = null;
                 console.log('Модальное окно закрыто по клику на фон');
             }
@@ -1123,9 +1126,13 @@ function setupChatEventListeners() {
     
     const sendMessage = async () => {
         const content = chatInput.value.trim();
-        if (!content || !currentTicketId) return;
+        if (!content || !currentTicketId) {
+            console.log('Отправка сообщения отменена. content:', !!content, 'currentTicketId:', currentTicketId);
+            return;
+        }
         
         try {
+            console.log('Отправляем сообщение для тикета:', currentTicketId);
             const messageData = {
                 content: content,
                 author_email: currentUser.email,
@@ -1180,6 +1187,32 @@ function setupChatEventListeners() {
             }
         };
     }
+    
+    // Обработчики для кнопок управления тикетом
+    const updatePriorityBtn = document.getElementById('updatePriorityBtn');
+    const closeTicketBtn = document.getElementById('closeTicketBtn');
+    
+    if (updatePriorityBtn) {
+        updatePriorityBtn.onclick = () => {
+            console.log('Нажата кнопка обновления приоритета. currentTicketId:', currentTicketId);
+            if (currentTicketId) {
+                updateTicketPriority(currentTicketId);
+            } else {
+                console.warn('currentTicketId не установлен, невозможно обновить приоритет');
+            }
+        };
+    }
+    
+    if (closeTicketBtn) {
+        closeTicketBtn.onclick = () => {
+            console.log('Нажата кнопка закрытия тикета. currentTicketId:', currentTicketId);
+            if (currentTicketId) {
+                closeTicket(currentTicketId);
+            } else {
+                console.warn('currentTicketId не установлен, невозможно закрыть тикет');
+            }
+        };
+    }
 }
 
 function debounce(func, wait) {
@@ -1218,11 +1251,13 @@ function formatDateTime(dateString) {
 function getStatusText(status) {
     const statusTexts = {
         'открыт': 'Открыт',
-        'в_процессе': 'В процессе',
+        'в работе': 'В работе',
+        'в_процессе': 'В работе',
+        'впроцессе': 'В работе',
         'решен': 'Решен',
         'закрыт': 'Закрыт'
     };
-    return statusTexts[status] || status;
+    return statusTexts[status] || status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, ' ');
 }
 
 function getCategoryText(category) {
@@ -1243,9 +1278,10 @@ function getPriorityText(priority) {
         'высокий': 'Высокий',
         'критический': 'Критический',
         'не определён': 'Не определён',
-        'не_определён': 'Не определён'
+        'не_определён': 'Не определён',
+        'неопределён': 'Не определён'
     };
-    return priorityTexts[priority] || 'Не определён';
+    return priorityTexts[priority] || priority.charAt(0).toUpperCase() + priority.slice(1).replace(/_/g, ' ');
 }
 
 function updateUserInfo() {
@@ -1397,11 +1433,11 @@ function addTicketManagementToChat(ticketId, ticket) {
                     </select>
                 </div>
                 <div class="ticket-actions">
-                    <button class="btn btn-primary btn-sm" onclick="updateTicketPriority('${ticketId}')">
+                    <button id="updatePriorityBtn" class="btn btn-primary btn-sm">
                         <i class="fas fa-save"></i>
                         Обновить приоритет
                     </button>
-                    <button class="btn btn-success btn-sm" onclick="closeTicket('${ticketId}')">
+                    <button id="closeTicketBtn" class="btn btn-success btn-sm">
                         <i class="fas fa-check"></i>
                         Закрыть тикет
                     </button>
@@ -1426,10 +1462,22 @@ function addTicketManagementToChat(ticketId, ticket) {
 }
 
 async function updateTicketPriority(ticketId) {
-    const priority = document.getElementById('chatPriority').value;
+    // Проверяем, что ticketId соответствует текущему открытому тикету
+    if (!ticketId || ticketId !== currentTicketId) {
+        console.warn('Попытка обновить приоритет некорректного тикета. ticketId:', ticketId, 'currentTicketId:', currentTicketId);
+        return;
+    }
+    
+    const prioritySelect = document.getElementById('chatPriority');
+    if (!prioritySelect) {
+        console.error('Элемент chatPriority не найден');
+        return;
+    }
+    
+    const priority = prioritySelect.value;
     
     try {
-        console.log('Обновляем приоритет тикета:', ticketId, 'на:', priority);
+        console.log('Обновляем приоритет тикета:', ticketId, 'на:', priority, '(currentTicketId:', currentTicketId, ')');
         
         const response = await authorizedFetch(`${API_BASE_URL}/tickets/${ticketId}`, {
             method: 'PATCH',
@@ -1441,13 +1489,15 @@ async function updateTicketPriority(ticketId) {
         
         if (!response.ok) {
             const errorText = await response.text();
+            console.error('Ошибка обновления приоритета:', errorText);
             throw new Error(`Ошибка обновления приоритета: ${errorText}`);
         }
         
         const updatedTicket = await response.json();
+        console.log('Приоритет успешно обновлён:', updatedTicket.priority);
         
         // Обновляем отображение приоритета в чате
-        updateChatPriorityDisplay(priority);
+        updateChatPriorityDisplay(updatedTicket.priority);
         
         showNotification('Приоритет тикета обновлен!', 'success');
         
@@ -1462,12 +1512,18 @@ async function updateTicketPriority(ticketId) {
 }
 
 async function closeTicket(ticketId) {
+    // Проверяем, что ticketId соответствует текущему открытому тикету
+    if (!ticketId || ticketId !== currentTicketId) {
+        console.warn('Попытка закрыть некорректный тикет. ticketId:', ticketId, 'currentTicketId:', currentTicketId);
+        return;
+    }
+    
     if (!confirm('Вы уверены, что хотите закрыть этот тикет?')) {
         return;
     }
     
     try {
-        console.log('Закрываем тикет:', ticketId);
+        console.log('Закрываем тикет:', ticketId, '(currentTicketId:', currentTicketId, ')');
         
         const response = await authorizedFetch(`${API_BASE_URL}/tickets/${ticketId}`, {
             method: 'PATCH',
@@ -1479,8 +1535,15 @@ async function closeTicket(ticketId) {
         
         if (!response.ok) {
             const errorText = await response.text();
+            console.error('Ошибка закрытия тикета:', errorText);
             throw new Error(`Ошибка закрытия тикета: ${errorText}`);
         }
+        
+        const updatedTicket = await response.json();
+        console.log('Тикет успешно закрыт:', updatedTicket);
+        
+        // Обновляем отображение статуса в чате
+        updateChatStatusDisplay('закрыт');
         
         showNotification('Тикет успешно закрыт!', 'success');
         
@@ -1505,7 +1568,8 @@ async function closeTicket(ticketId) {
             document.body.classList.remove('modal-open');
         }
         
-        // Очищаем текущий тикет в самом конце
+        // Очищаем текущий тикет сразу после закрытия
+        console.log('Очищаем currentTicketId:', currentTicketId, '→ null');
         currentTicketId = null;
         
         console.log('Модальное окно закрыто, тикет:', ticketId, 'статус закрыт');
@@ -1518,10 +1582,13 @@ async function closeTicket(ticketId) {
 
 // Обновляет отображение приоритета в интерфейсе чата
 function updateChatPriorityDisplay(newPriority) {
+    console.log('Обновляем отображение приоритета на:', newPriority);
+    
     // Обновляем значение в выпадающем списке
     const chatPrioritySelect = document.getElementById('chatPriority');
     if (chatPrioritySelect) {
         chatPrioritySelect.value = newPriority;
+        console.log('Приоритет в селекте обновлен на:', newPriority);
     }
     
     // Обновляем отображение в деталях тикета
@@ -1530,14 +1597,33 @@ function updateChatPriorityDisplay(newPriority) {
         const priorityBadge = ticketDetails.querySelector('.priority-badge');
         if (priorityBadge) {
             // Удаляем старые классы приоритета
-            priorityBadge.classList.remove('priority-низкий', 'priority-средний', 'priority-высокий', 'priority-критический');
+            priorityBadge.classList.remove('priority-низкий', 'priority-средний', 'priority-высокий', 'priority-критический', 'priority-не_определён');
             // Добавляем новый класс
             priorityBadge.classList.add(`priority-${newPriority}`);
             // Обновляем текст
             priorityBadge.textContent = getPriorityText(newPriority);
+            console.log('Бейдж приоритета обновлен на:', getPriorityText(newPriority));
         }
     }
+}
+
+// Обновляет отображение статуса в интерфейсе чата  
+function updateChatStatusDisplay(newStatus) {
+    console.log('Обновляем отображение статуса на:', newStatus);
     
-    console.log('Priority display updated to:', newPriority);
+    // Обновляем отображение в деталях тикета
+    const ticketDetails = document.getElementById('supportTicketDetails');
+    if (ticketDetails) {
+        const statusBadge = ticketDetails.querySelector('.status-badge');
+        if (statusBadge) {
+            // Удаляем старые классы статуса
+            statusBadge.classList.remove('status-открыт', 'status-в_работе', 'status-решен', 'status-закрыт');
+            // Добавляем новый класс
+            statusBadge.classList.add(`status-${newStatus}`);
+            // Обновляем текст
+            statusBadge.textContent = getStatusText(newStatus);
+            console.log('Бейдж статуса обновлен на:', getStatusText(newStatus));
+        }
+    }
 }
 

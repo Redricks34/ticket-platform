@@ -7,7 +7,8 @@ import re
 
 class TicketStatus(str, Enum):
     OPEN = "открыт"
-    IN_PROGRESS = "в_процессе"
+    IN_PROGRESS = "в работе"
+    IN_PROGRESS_OLD = "в_процессе"  # Для обратной совместимости
     CLOSED = "закрыт"
     RESOLVED = "решен"
 
