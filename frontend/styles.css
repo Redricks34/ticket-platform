@@ -596,6 +596,153 @@ body {
     100% { transform: rotate(360deg); }
 }
 
+/* Модальное окно техподдержки */
+.support-modal-content {
+    background: white;
+    width: 95vw;
+    max-width: 1200px;
+    height: 90vh;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.support-modal-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #f8fafc;
+}
+
+.support-modal-body {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+}
+
+.ticket-info-panel {
+    width: 40%;
+    border-right: 1px solid #e2e8f0;
+    padding: 1.5rem;
+    overflow-y: auto;
+    background: #f8fafc;
+}
+
+.chat-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: white;
+}
+
+.chat-messages {
+    flex: 1;
+    padding: 1rem;
+    overflow-y: auto;
+    background: #fafbfc;
+}
+
+.chat-message {
+    margin-bottom: 1rem;
+    display: flex;
+    flex-direction: column;
+}
+
+.chat-message.support {
+    align-items: flex-end;
+}
+
+.chat-message.user {
+    align-items: flex-start;
+}
+
+.message-bubble {
+    max-width: 70%;
+    padding: 0.75rem 1rem;
+    border-radius: 18px;
+    word-wrap: break-word;
+}
+
+.chat-message.support .message-bubble {
+    background: #3b82f6;
+    color: white;
+    border-bottom-right-radius: 6px;
+}
+
+.chat-message.user .message-bubble {
+    background: #e5e7eb;
+    color: #1f2937;
+    border-bottom-left-radius: 6px;
+}
+
+.message-meta {
+    font-size: 0.75rem;
+    color: #6b7280;
+    margin-top: 0.25rem;
+    padding: 0 1rem;
+}
+
+.chat-input-container {
+    border-top: 1px solid #e2e8f0;
+    padding: 1rem;
+    background: white;
+}
+
+.chat-input-wrapper {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-end;
+}
+
+.chat-input-wrapper textarea {
+    flex: 1;
+    border: 1px solid #d1d5db;
+    border-radius: 20px;
+    padding: 0.75rem 1rem;
+    resize: none;
+    font-family: inherit;
+    line-height: 1.4;
+}
+
+.chat-input-wrapper textarea:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.chat-input-wrapper .btn {
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+.ticket-details h4 {
+    color: #1e293b;
+    margin-bottom: 0.5rem;
+}
+
+.ticket-details .detail-group {
+    margin-bottom: 1.5rem;
+}
+
+.ticket-details .detail-label {
+    font-weight: 600;
+    color: #475569;
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+}
+
+.ticket-details .detail-value {
+    color: #1e293b;
+}
+
 /* Notifications */
 .notifications {
     position: fixed;

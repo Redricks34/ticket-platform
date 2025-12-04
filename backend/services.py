@@ -236,3 +236,76 @@ class TicketService:
             query["$text"] = {"$search": filters.search_text}
         
         return query
+    
+    @staticmethod
+    async def assign_ticket(ticket_id: str, assignee_email: str, assignee_name: str) -> TicketResponse:
+        """Назначить тикет сотруднику техподдержки."""
+        if not ObjectId.is_valid(ticket_id):
+            raise HTTPException(status_code=400, detail="Некорректный ID тикета")
+        
+        collection = get_tickets_collection()
+        
+        # Проверяем, что тикет существует и не назначен
+        ticket = await collection.find_one({"_id": ObjectId(ticket_id)})
+        if not ticket:
+            raise HTTPException(status_code=404, detail="Тикет не найден")
+        
+        if ticket.get("assignee_id"):
+            raise HTTPException(status_code=400, detail="Тикет уже назначен")
+        
+        # Назначаем тикет
+        update_dict = {
+            "assignee_id": assignee_email,  # Используем email как ID
+            "assignee_name": assignee_name,
+            "status": "в_процессе",
+            "updated_at": datetime.utcnow()
+        }
+        
+        result = await collection.find_one_and_update(
+            {"_id": ObjectId(ticket_id)},
+            {"$set": update_dict},
+            return_document=True
+        )
+        
+        response = TicketService._ticket_to_response(result)
+        
+        # Отправляем уведомление о назначении
+        await notification_service.publish_ticket_event("assigned", response.model_dump())
+        
+        logger.info(f"Тикет {ticket_id} назначен пользователю {assignee_email}")
+        return response
+    
+    @staticmethod
+    async def get_assigned_tickets(assignee_email: str, page: int = 1, page_size: int = 20) -> PaginatedResponse:
+        """Получить тикеты, назначенные конкретному сотруднику техподдержки."""
+        filters = TicketFilters(assignee_id=assignee_email)
+        return await TicketService.get_tickets(filters, page, page_size)
+    
+    @staticmethod
+    async def get_unassigned_tickets(page: int = 1, page_size: int = 20) -> PaginatedResponse:
+        """Получить неназначенные тикеты для техподдержки."""
+        collection = get_tickets_collection()
+        
+        query = {"assignee_id": {"$exists": False}}
+        
+        # Подсчитываем общее количество
+        total = await collection.count_documents(query)
+        
+        # Вычисляем пагинацию
+        skip = (page - 1) * page_size
+        total_pages = (total + page_size - 1) // page_size
+        
+        # Получаем тикеты
+        cursor = collection.find(query).sort("created_at", -1).skip(skip).limit(page_size)
+        tickets = []
+        
+        async for ticket_doc in cursor:
+            tickets.append(TicketService._ticket_to_response(ticket_doc))
+        
+        return PaginatedResponse(
+            tickets=tickets,
+            total=total,
+            page=page,
+            page_size=page_size,
+            total_pages=total_pages
+        )

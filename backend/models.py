@@ -125,7 +125,27 @@ class PaginatedResponse(BaseModel):
     total_pages: int
 
 class TicketNotification(BaseModel):
-    event: str  # "created", "updated", "closed", "comment_added"
+    event: str  # "created", "updated", "closed", "comment_added", "assigned"
     ticket_id: str
     ticket: TicketResponse
+
+class TicketAssignRequest(BaseModel):
+    assignee_email: str = Field(..., description="Email сотрудника техподдержки")
+    assignee_name: str = Field(..., description="Имя сотрудника техподдержки")
+
+class MessageCreate(BaseModel):
+    content: str = Field(..., min_length=1, max_length=1000, description="Содержимое сообщения")
+    author_email: str = Field(..., description="Email автора сообщения")
+    author_name: str = Field(..., description="Имя автора сообщения")
+
+class Message(BaseModel):
+    id: str = Field(default="", alias="_id")
+    ticket_id: str = Field(..., description="ID тикета")
+    content: str = Field(..., description="Содержимое сообщения")
+    author_email: str = Field(..., description="Email автора")
+    author_name: str = Field(..., description="Имя автора")
+    is_support: bool = Field(default=False, description="Сообщение от техподдержки")
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    model_config = {"populate_by_name": True}
     timestamp: datetime = Field(default_factory=datetime.utcnow)

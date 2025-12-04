@@ -161,3 +161,44 @@ async def get_ticket_stats():
         stats["by_category"][category_key] = stats["by_category"].get(category_key, 0) + 1
     
     return stats
+
+# Маршруты для сообщений
+@router.get("/{ticket_id}/messages", response_model=List[dict])
+async def get_ticket_messages(ticket_id: str):
+    """Получить все сообщения для тикета."""
+    try:
+        from message_service import message_service
+        messages = await message_service.get_messages_by_ticket(ticket_id)
+        return [message.model_dump() for message in messages]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/{ticket_id}/messages")
+async def create_ticket_message(ticket_id: str, message_data: dict):
+    """Создать новое сообщение в тикете."""
+    try:
+        from message_service import message_service
+        from models import MessageCreate
+        
+        message_create = MessageCreate(**message_data)
+        message = await message_service.create_message(ticket_id, message_create)
+        
+        # Отправляем уведомление через WebSocket
+        await notification_service.publish_ticket_event("message_added", {
+            "ticket_id": ticket_id,
+            "message": message.model_dump()
+        })
+        
+        return message.model_dump()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/{ticket_id}/unread-count")
+async def get_unread_messages_count(ticket_id: str, user_email: str):
+    """Получить количество непрочитанных сообщений для пользователя."""
+    try:
+        from message_service import message_service
+        count = await message_service.get_unread_count(ticket_id, user_email)
+        return {"count": count}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

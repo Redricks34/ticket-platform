@@ -10,6 +10,9 @@ let websocket = null;
 let userEmail = '';
 let currentUser = null;
 let authToken = '';
+let isSupportUser = false;
+let currentTicketId = null;
+let messagesSocket = null;
 
 // Функция для авторизованных запросов
 function getAuthHeaders() {
@@ -62,9 +65,11 @@ function checkAuthentication() {
     initializeApp();
 }
 
-function initializeApp() {
+async function initializeApp() {
     updateUserInfo();
+    await checkSupportStatus();
     setupEventListeners();
+    setupSupportInterface();
     loadUserTickets();
     connectWebSocket();
 }
@@ -90,6 +95,77 @@ function logout() {
         websocket.close();
     }
     window.location.href = 'login.html';
+}
+
+// Проверка статуса техподдержки
+async function checkSupportStatus() {
+    try {
+        const response = await authorizedFetch(`${API_BASE_URL}/support/check`);
+        if (response.ok) {
+            const data = await response.json();
+            isSupportUser = data.is_support;
+        }
+    } catch (error) {
+        // Пользователь не является сотрудником техподдержки
+        isSupportUser = false;
+    }
+}
+
+// Настройка интерфейса для техподдержки
+function setupSupportInterface() {
+    if (!isSupportUser) return;
+    
+    // Добавляем вкладки для техподдержки
+    const nav = document.querySelector('.nav-list');
+    const supportTabsHTML = `
+        <li class="nav-item">
+            <a href="#" class="nav-link" data-tab="unassigned">
+                <i class="fas fa-inbox"></i>
+                Новые тикеты
+            </a>
+        </li>
+        <li class="nav-item">
+            <a href="#" class="nav-link" data-tab="assigned">
+                <i class="fas fa-tasks"></i>
+                Принятые
+            </a>
+        </li>
+    `;
+    
+    // Вставляем перед профилем
+    const profileItem = nav.querySelector('[data-tab="profile"]').parentElement;
+    profileItem.insertAdjacentHTML('beforebegin', supportTabsHTML);
+    
+    // Добавляем секции для техподдержки
+    const mainContainer = document.querySelector('main .container');
+    const supportSectionsHTML = `
+        <!-- Новые тикеты для техподдержки -->
+        <section id="unassigned-tab" class="tab-content">
+            <div class="page-header">
+                <h1>Новые тикеты</h1>
+                <p class="page-subtitle">Тикеты, ожидающие назначения</p>
+            </div>
+            <div class="tickets-grid" id="unassignedTicketsGrid">
+                <!-- Тикеты будут загружены динамически -->
+            </div>
+        </section>
+        
+        <!-- Принятые тикеты -->
+        <section id="assigned-tab" class="tab-content">
+            <div class="page-header">
+                <h1>Принятые тикеты</h1>
+                <p class="page-subtitle">Ваши назначенные тикеты</p>
+            </div>
+            <div class="tickets-grid" id="assignedTicketsGrid">
+                <!-- Тикеты будут загружены динамически -->
+            </div>
+        </section>
+    `;
+    
+    mainContainer.insertAdjacentHTML('beforeend', supportSectionsHTML);
+    
+    // Переустанавливаем обработчики событий для новых кнопок навигации
+    setupNavigationEvents();
 }
 
 // Функции для работы с профилем
@@ -178,8 +254,8 @@ async function handleProfileUpdate(event) {
     }
 }
 
-// Настройка обработчиков событий
-function setupEventListeners() {
+// Настройка обработчиков навигации
+function setupNavigationEvents() {
     // Навигация по вкладкам
     document.querySelectorAll('.nav-link').forEach(link => {
         link.addEventListener('click', (e) => {
@@ -191,6 +267,12 @@ function setupEventListeners() {
             }
         });
     });
+}
+
+// Настройка обработчиков событий
+function setupEventListeners() {
+    // Навигация по вкладкам
+    setupNavigationEvents();
 
     // Форма создания тикета - с проверкой существования
     const createForm = document.getElementById('createTicketForm');
@@ -277,6 +359,10 @@ function switchTab(tabName) {
         targetSection = document.getElementById('home-tab');
     } else if (tabName === 'create') {
         targetSection = document.getElementById('create-tab');
+    } else if (tabName === 'unassigned') {
+        targetSection = document.getElementById('unassigned-tab');
+    } else if (tabName === 'assigned') {
+        targetSection = document.getElementById('assigned-tab');
     } else if (tabName === 'profile') {
         targetSection = document.getElementById('profile');
     }
@@ -291,6 +377,10 @@ function switchTab(tabName) {
         loadUserTickets();
     } else if (tabName === 'create') {
         prefillTicketForm();
+    } else if (tabName === 'unassigned') {
+        loadUnassignedTickets();
+    } else if (tabName === 'assigned') {
+        loadAssignedTickets();
     } else if (tabName === 'profile') {
         loadProfileData();
     }
@@ -766,6 +856,281 @@ function showNotification(message, type = 'success') {
             notification.parentNode.removeChild(notification);
         }
     }, 5000);
+}
+
+// Функции техподдержки
+async function loadUnassignedTickets() {
+    if (!isSupportUser) return;
+    
+    try {
+        const response = await authorizedFetch(`${API_BASE_URL}/support/tickets/unassigned`);
+        if (!response.ok) {
+            throw new Error('Ошибка загрузки новых тикетов');
+        }
+        
+        const data = await response.json();
+        renderSupportTickets(data.tickets, 'unassignedTicketsGrid', true);
+    } catch (error) {
+        console.error('Ошибка загрузки новых тикетов:', error);
+        showNotification('Ошибка загрузки новых тикетов', 'error');
+    }
+}
+
+async function loadAssignedTickets() {
+    if (!isSupportUser) return;
+    
+    try {
+        const response = await authorizedFetch(`${API_BASE_URL}/support/tickets/assigned`);
+        if (!response.ok) {
+            throw new Error('Ошибка загрузки принятых тикетов');
+        }
+        
+        const data = await response.json();
+        renderSupportTickets(data.tickets, 'assignedTicketsGrid', false);
+    } catch (error) {
+        console.error('Ошибка загрузки принятых тикетов:', error);
+        showNotification('Ошибка загрузки принятых тикетов', 'error');
+    }
+}
+
+function renderSupportTickets(tickets, containerId, showAcceptButton = false) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    
+    if (tickets.length === 0) {
+        container.innerHTML = '<div class="no-tickets">Нет тикетов</div>';
+        return;
+    }
+    
+    container.innerHTML = tickets.map(ticket => `
+        <div class="ticket-card priority-${ticket.priority}" data-ticket-id="${ticket.id}">
+            <div class="ticket-header">
+                <div class="ticket-meta">
+                    <span class="ticket-id">#${ticket.id.substring(0, 8)}</span>
+                    <span class="ticket-date">${new Date(ticket.created_at).toLocaleDateString()}</span>
+                </div>
+                <div class="ticket-badges">
+                    <span class="status-badge status-${ticket.status}">${ticket.status}</span>
+                    <span class="priority-badge priority-${ticket.priority}">${ticket.priority}</span>
+                </div>
+            </div>
+            <h3 class="ticket-title">${ticket.title}</h3>
+            <p class="ticket-description">${ticket.description.substring(0, 150)}...</p>
+            <div class="ticket-footer">
+                <div class="ticket-reporter">
+                    <i class="fas fa-user"></i>
+                    <span>${ticket.reporter_name}</span>
+                </div>
+                <div class="ticket-actions">
+                    ${showAcceptButton ? `
+                        <button class="btn btn-primary btn-sm" onclick="acceptTicket('${ticket.id}')">
+                            <i class="fas fa-hand-paper"></i>
+                            Принять
+                        </button>
+                    ` : `
+                        <button class="btn btn-secondary btn-sm" onclick="openSupportTicketModal('${ticket.id}')">
+                            <i class="fas fa-comments"></i>
+                            Открыть чат
+                        </button>
+                    `}
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+async function acceptTicket(ticketId) {
+    try {
+        const response = await authorizedFetch(`${API_BASE_URL}/support/tickets/${ticketId}/assign`, {
+            method: 'POST'
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Ошибка принятия тикета');
+        }
+        
+        showNotification('Тикет успешно принят!', 'success');
+        
+        // Обновляем списки
+        loadUnassignedTickets();
+        loadAssignedTickets();
+        
+    } catch (error) {
+        console.error('Ошибка принятия тикета:', error);
+        showNotification(error.message, 'error');
+    }
+}
+
+async function openSupportTicketModal(ticketId) {
+    currentTicketId = ticketId;
+    
+    try {
+        // Загружаем детали тикета
+        const ticketResponse = await authorizedFetch(`${API_BASE_URL}/tickets/${ticketId}`);
+        const ticket = await ticketResponse.json();
+        
+        // Загружаем сообщения
+        const messagesResponse = await authorizedFetch(`${API_BASE_URL}/tickets/${ticketId}/messages`);
+        const messages = await messagesResponse.json();
+        
+        renderSupportTicketModal(ticket, messages);
+        document.getElementById('supportTicketModal').classList.add('active');
+        
+        // Отмечаем как прочитанные
+        await authorizedFetch(`${API_BASE_URL}/support/tickets/${ticketId}/mark-read`, {
+            method: 'POST'
+        });
+        
+    } catch (error) {
+        console.error('Ошибка загрузки тикета:', error);
+        showNotification('Ошибка загрузки тикета', 'error');
+    }
+}
+
+function renderSupportTicketModal(ticket, messages) {
+    // Обновляем заголовок
+    document.getElementById('supportModalTicketTitle').textContent = `Тикет #${ticket.id.substring(0, 8)}`;
+    
+    // Рендерим детали тикета
+    const ticketDetails = document.getElementById('supportTicketDetails');
+    ticketDetails.innerHTML = `
+        <div class="detail-group">
+            <div class="detail-label">Заголовок</div>
+            <div class="detail-value"><strong>${ticket.title}</strong></div>
+        </div>
+        <div class="detail-group">
+            <div class="detail-label">Описание</div>
+            <div class="detail-value">${ticket.description}</div>
+        </div>
+        <div class="detail-group">
+            <div class="detail-label">Статус</div>
+            <div class="detail-value">
+                <span class="status-badge status-${ticket.status}">${ticket.status}</span>
+            </div>
+        </div>
+        <div class="detail-group">
+            <div class="detail-label">Приоритет</div>
+            <div class="detail-value">
+                <span class="priority-badge priority-${ticket.priority}">${ticket.priority}</span>
+            </div>
+        </div>
+        <div class="detail-group">
+            <div class="detail-label">Автор</div>
+            <div class="detail-value">
+                <strong>${ticket.reporter_name}</strong><br>
+                <small>${ticket.reporter_email}</small>
+            </div>
+        </div>
+        <div class="detail-group">
+            <div class="detail-label">Создан</div>
+            <div class="detail-value">${new Date(ticket.created_at).toLocaleString()}</div>
+        </div>
+    `;
+    
+    // Рендерим сообщения
+    renderChatMessages(messages);
+    
+    // Настраиваем обработчики
+    setupChatEventListeners();
+}
+
+function renderChatMessages(messages) {
+    const chatContainer = document.getElementById('chatMessages');
+    
+    if (messages.length === 0) {
+        chatContainer.innerHTML = '<div style="text-align: center; color: #6b7280; padding: 2rem;">Сообщений пока нет</div>';
+        return;
+    }
+    
+    chatContainer.innerHTML = messages.map(message => `
+        <div class="chat-message ${message.is_support ? 'support' : 'user'}">
+            <div class="message-bubble">
+                ${message.content}
+            </div>
+            <div class="message-meta">
+                ${message.author_name} • ${new Date(message.created_at).toLocaleString()}
+            </div>
+        </div>
+    `).join('');
+    
+    // Прокручиваем к последнему сообщению
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+}
+
+function setupChatEventListeners() {
+    // Закрытие модального окна
+    const closeBtn = document.getElementById('closeSupportModal');
+    if (closeBtn) {
+        closeBtn.onclick = () => {
+            document.getElementById('supportTicketModal').classList.remove('active');
+            currentTicketId = null;
+        };
+    }
+    
+    // Отправка сообщения
+    const sendBtn = document.getElementById('sendMessage');
+    const chatInput = document.getElementById('chatInput');
+    
+    const sendMessage = async () => {
+        const content = chatInput.value.trim();
+        if (!content || !currentTicketId) return;
+        
+        try {
+            const messageData = {
+                content: content,
+                author_email: currentUser.email,
+                author_name: currentUser.full_name
+            };
+            
+            const response = await authorizedFetch(`${API_BASE_URL}/tickets/${currentTicketId}/messages`, {
+                method: 'POST',
+                body: JSON.stringify(messageData)
+            });
+            
+            if (!response.ok) {
+                throw new Error('Ошибка отправки сообщения');
+            }
+            
+            const newMessage = await response.json();
+            
+            // Добавляем сообщение в чат
+            const chatContainer = document.getElementById('chatMessages');
+            const messageHTML = `
+                <div class="chat-message support">
+                    <div class="message-bubble">
+                        ${newMessage.content}
+                    </div>
+                    <div class="message-meta">
+                        ${newMessage.author_name} • ${new Date(newMessage.created_at).toLocaleString()}
+                    </div>
+                </div>
+            `;
+            
+            chatContainer.insertAdjacentHTML('beforeend', messageHTML);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+            
+            // Очищаем поле ввода
+            chatInput.value = '';
+            
+        } catch (error) {
+            console.error('Ошибка отправки сообщения:', error);
+            showNotification('Ошибка отправки сообщения', 'error');
+        }
+    };
+    
+    if (sendBtn) {
+        sendBtn.onclick = sendMessage;
+    }
+    
+    if (chatInput) {
+        chatInput.onkeypress = (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        };
+    }
 }
 
 function debounce(func, wait) {

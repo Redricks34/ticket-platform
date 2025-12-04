@@ -81,6 +81,28 @@ const AuthAPI = {
         }
 
         return response.json();
+    },
+
+    async checkSupportStatus() {
+        const token = TokenManager.getToken();
+        if (!token) {
+            return { is_support: false };
+        }
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/support/check`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (response.ok) {
+                return await response.json();
+            }
+            return { is_support: false };
+        } catch (error) {
+            return { is_support: false };
+        }
     }
 };
 

@@ -346,6 +346,43 @@
         </div>
     </div>
 
+    <!-- Модальное окно для техподдержки с чатом -->
+    <div class="modal" id="supportTicketModal">
+        <div class="support-modal-content">
+            <div class="support-modal-header">
+                <h2 id="supportModalTicketTitle">Тикет #</h2>
+                <button class="modal-close" id="closeSupportModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="support-modal-body">
+                <div class="ticket-info-panel">
+                    <div class="ticket-details" id="supportTicketDetails">
+                        <!-- Детали тикета будут загружены динамически -->
+                    </div>
+                </div>
+                <div class="chat-panel">
+                    <div class="chat-messages" id="chatMessages">
+                        <!-- Сообщения будут загружены динамически -->
+                    </div>
+                    <div class="chat-input-container">
+                        <div class="chat-input-wrapper">
+                            <textarea 
+                                id="chatInput" 
+                                placeholder="Введите сообщение..." 
+                                rows="2"
+                                maxlength="1000"
+                            ></textarea>
+                            <button id="sendMessage" class="btn btn-primary">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Уведомления -->
     <div class="notifications" id="notifications"></div>
 

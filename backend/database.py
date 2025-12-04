@@ -30,9 +30,11 @@ class Database:
     async def create_indexes(cls):
         """Создать индексы для оптимизации запросов."""
         tickets_collection = cls.database.tickets
+        messages_collection = cls.database.messages
+        read_status_collection = cls.database.read_status
         
-        # Индексы для быстрого поиска
-        indexes = [
+        # Индексы для тикетов
+        ticket_indexes = [
             IndexModel([("status", ASCENDING)]),
             IndexModel([("priority", ASCENDING)]),
             IndexModel([("category", ASCENDING)]),
@@ -47,7 +49,22 @@ class Database:
             IndexModel([("title", "text"), ("description", "text")])
         ]
         
-        await tickets_collection.create_indexes(indexes)
+        # Индексы для сообщений
+        message_indexes = [
+            IndexModel([("ticket_id", ASCENDING)]),
+            IndexModel([("created_at", DESCENDING)]),
+            IndexModel([("author_email", ASCENDING)]),
+            IndexModel([("ticket_id", ASCENDING), ("created_at", ASCENDING)])
+        ]
+        
+        # Индексы для статуса прочтения
+        read_status_indexes = [
+            IndexModel([("ticket_id", ASCENDING), ("user_email", ASCENDING)], unique=True)
+        ]
+        
+        await tickets_collection.create_indexes(ticket_indexes)
+        await messages_collection.create_indexes(message_indexes)
+        await read_status_collection.create_indexes(read_status_indexes)
         
         # Создаем индексы для коллекции пользователей
         users_collection = cls.database.users
@@ -65,9 +82,17 @@ class Database:
         """Получить коллекцию по имени."""
         return cls.database[name]
 
+# Свойства для быстрого доступа к коллекциям (устанавливаются после подключения к БД)
+
 # Функции для получения коллекций
 def get_tickets_collection() -> AsyncIOMotorCollection:
     return Database.get_collection("tickets")
 
 def get_users_collection() -> AsyncIOMotorCollection:
     return Database.get_collection("users")
+
+def get_messages_collection() -> AsyncIOMotorCollection:
+    return Database.get_collection("messages")
+
+def get_read_status_collection() -> AsyncIOMotorCollection:
+    return Database.get_collection("read_status")

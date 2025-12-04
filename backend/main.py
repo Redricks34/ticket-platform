@@ -61,6 +61,13 @@ app.add_middleware(
 app.include_router(tickets_router)
 app.include_router(auth_router)
 
+# Подключаем маршруты техподдержки
+try:
+    from support_routes import router as support_router
+    app.include_router(support_router)
+except ImportError:
+    logger.warning("Модуль support_routes не найден")
+
 # Основной endpoint для проверки работоспособности
 @app.get("/", summary="Проверка работоспособности")
 async def root():
