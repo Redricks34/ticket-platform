@@ -48,6 +48,16 @@ class Database:
         ]
         
         await tickets_collection.create_indexes(indexes)
+        
+        # Создаем индексы для коллекции пользователей
+        users_collection = cls.database.users
+        users_indexes = [
+            IndexModel([("email", ASCENDING)], unique=True),
+            IndexModel([("username", ASCENDING)], unique=True),
+            IndexModel([("created_at", DESCENDING)])
+        ]
+        await users_collection.create_indexes(users_indexes)
+        
         logger.info("Индексы созданы успешно")
     
     @classmethod

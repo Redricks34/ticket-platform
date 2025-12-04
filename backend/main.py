@@ -6,6 +6,7 @@ import logging
 from database import Database
 from notifications import notification_service
 from routes import router as tickets_router
+from auth_routes import router as auth_router
 
 # Настройка логирования
 logging.basicConfig(
@@ -58,6 +59,7 @@ app.add_middleware(
 
 # Подключение маршрутов
 app.include_router(tickets_router)
+app.include_router(auth_router)
 
 # Основной endpoint для проверки работоспособности
 @app.get("/", summary="Проверка работоспособности")

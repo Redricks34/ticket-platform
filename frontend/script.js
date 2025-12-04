@@ -7,18 +7,175 @@ let currentPage = 1;
 let totalPages = 1;
 let currentFilters = {};
 let websocket = null;
-let userEmail = localStorage.getItem('userEmail') || 'user@example.com'; // В реальной системе будет из авторизации
+let userEmail = '';
+let currentUser = null;
+let authToken = '';
+
+// Функция для авторизованных запросов
+function getAuthHeaders() {
+    return {
+        'Authorization': `Bearer ${authToken}`,
+        'Content-Type': 'application/json'
+    };
+}
+
+async function authorizedFetch(url, options = {}) {
+    const headers = {
+        ...getAuthHeaders(),
+        ...options.headers
+    };
+    
+    const response = await fetch(url, {
+        ...options,
+        headers
+    });
+    
+    if (response.status === 401) {
+        // Токен истек или недействителен
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('user_data');
+        window.location.href = 'login.html';
+        return;
+    }
+    
+    return response;
+}
 
 // Инициализация приложения
 document.addEventListener('DOMContentLoaded', function() {
-    initializeApp();
+    checkAuthentication();
 });
 
+function checkAuthentication() {
+    const token = localStorage.getItem('auth_token');
+    const userData = localStorage.getItem('user_data');
+    
+    if (!token || !userData) {
+        window.location.href = 'login.html';
+        return;
+    }
+    
+    authToken = token;
+    currentUser = JSON.parse(userData);
+    userEmail = currentUser.email;
+    
+    initializeApp();
+}
+
 function initializeApp() {
+    updateUserInfo();
     setupEventListeners();
     loadUserTickets();
     connectWebSocket();
-    updateUserInfo();
+}
+
+function updateUserInfo() {
+    // Обновляем отображение информации о пользователе
+    const usernameDisplay = document.getElementById('username-display');
+    const userInfo = document.getElementById('user-info');
+    
+    if (usernameDisplay && currentUser) {
+        usernameDisplay.textContent = currentUser.full_name || currentUser.username;
+        if (userInfo) {
+            userInfo.style.display = 'block';
+        }
+    }
+}
+
+// Функция выхода из системы
+function logout() {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('user_data');
+    if (websocket) {
+        websocket.close();
+    }
+    window.location.href = 'login.html';
+}
+
+// Функции для работы с профилем
+function loadProfileData() {
+    if (!currentUser) return;
+    
+    // Заполняем информацию о пользователе
+    document.getElementById('profile-full-name').textContent = currentUser.full_name;
+    document.getElementById('profile-email').textContent = currentUser.email;
+    document.getElementById('profile-role').textContent = currentUser.is_support_staff ? 'Сотрудник поддержки' : 'Пользователь';
+    
+    // Заполняем форму редактирования
+    document.getElementById('profileFullName').value = currentUser.full_name;
+    document.getElementById('profileUsername').value = currentUser.username;
+    document.getElementById('profileEmail').value = currentUser.email;
+    
+    // Загружаем статистику пользователя
+    loadUserStats();
+}
+
+async function loadUserStats() {
+    try {
+        const response = await authorizedFetch(`${API_BASE_URL}/tickets/?reporter_email=${encodeURIComponent(currentUser.email)}&limit=1000`);
+        const data = await response.json();
+        
+        const tickets = data.tickets || [];
+        const openTickets = tickets.filter(t => t.status === 'открыт' || t.status === 'в_процессе').length;
+        const resolvedTickets = tickets.filter(t => t.status === 'решен' || t.status === 'закрыт').length;
+        
+        document.getElementById('user-tickets-count').textContent = tickets.length;
+        document.getElementById('user-open-tickets').textContent = openTickets;
+        document.getElementById('user-resolved-tickets').textContent = resolvedTickets;
+        
+    } catch (error) {
+        console.error('Ошибка загрузки статистики:', error);
+    }
+}
+
+async function handleProfileUpdate(event) {
+    event.preventDefault();
+    
+    const form = event.target;
+    const submitBtn = form.querySelector('button[type="submit"]');
+    
+    const formData = new FormData(form);
+    const updateData = {
+        full_name: formData.get('full_name') || formData.get('profileFullName'),
+        username: formData.get('username') || formData.get('profileUsername')
+    };
+    
+    // Проверяем, что есть изменения
+    if (updateData.full_name === currentUser.full_name && updateData.username === currentUser.username) {
+        showMessage('Нет изменений для сохранения', 'info');
+        return;
+    }
+    
+    setButtonLoading(submitBtn, true);
+    
+    try {
+        const response = await authorizedFetch(`${API_BASE_URL}/auth/me`, {
+            method: 'PUT',
+            body: JSON.stringify(updateData)
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Ошибка обновления профиля');
+        }
+        
+        const updatedUser = await response.json();
+        
+        // Обновляем локальные данные
+        currentUser = updatedUser;
+        TokenManager.setUser(updatedUser);
+        
+        // Обновляем отображение
+        updateUserInfo();
+        loadProfileData();
+        
+        showMessage('Профиль успешно обновлен!', 'success');
+        
+    } catch (error) {
+        showMessage(error.message, 'error');
+    } finally {
+        setButtonLoading(submitBtn, false);
+    }
 }
 
 // Настройка обработчиков событий
@@ -27,24 +184,59 @@ function setupEventListeners() {
     document.querySelectorAll('.nav-link').forEach(link => {
         link.addEventListener('click', (e) => {
             e.preventDefault();
-            switchTab(link.dataset.tab);
+            if (link.id === 'logout-btn') {
+                logout();
+            } else {
+                switchTab(link.dataset.tab);
+            }
         });
     });
 
-    // Форма создания тикета
-    document.getElementById('createTicketForm').addEventListener('submit', handleTicketSubmit);
-    document.getElementById('resetForm').addEventListener('click', resetCreateForm);
+    // Форма создания тикета - с проверкой существования
+    const createForm = document.getElementById('createTicketForm');
+    if (createForm) {
+        createForm.addEventListener('submit', handleTicketSubmit);
+    }
+    
+    const resetBtn = document.getElementById('resetForm');
+    if (resetBtn) {
+        resetBtn.addEventListener('click', resetCreateForm);
+    }
 
-    // Фильтры
-    document.getElementById('statusFilter').addEventListener('change', applyFilters);
-    document.getElementById('categoryFilter').addEventListener('change', applyFilters);
-    document.getElementById('searchInput').addEventListener('input', debounce(applyFilters, 500));
+    // Фильтры - с проверкой существования
+    const statusFilter = document.getElementById('statusFilter');
+    if (statusFilter) {
+        statusFilter.addEventListener('change', applyFilters);
+    }
+    
+    const categoryFilter = document.getElementById('categoryFilter');
+    if (categoryFilter) {
+        categoryFilter.addEventListener('change', applyFilters);
+    }
+    
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+        searchInput.addEventListener('input', debounce(applyFilters, 500));
+    }
+    
+    // Форма профиля - с проверкой существования
+    const profileForm = document.getElementById('profileForm');
+    if (profileForm) {
+        profileForm.addEventListener('submit', handleProfileUpdate);
+    }
 
-    // Модальное окно
-    document.getElementById('closeModal').addEventListener('click', closeModal);
-    document.getElementById('ticketModal').addEventListener('click', (e) => {
-        if (e.target.id === 'ticketModal') closeModal();
-    });
+    // Модальное окно - с проверкой существования
+    const closeModalBtn = document.getElementById('closeModal');
+    if (closeModalBtn) {
+        closeModalBtn.addEventListener('click', closeModal);
+    }
+    
+    const ticketModal = document.getElementById('ticketModal');
+    if (ticketModal) {
+        ticketModal.addEventListener('click', (e) => {
+            if (e.target.id === 'ticketModal') closeModal();
+        });
+    }
 
     // Закрытие модального окна по Escape
     document.addEventListener('keydown', (e) => {
@@ -60,17 +252,40 @@ function switchTab(tabName) {
     document.querySelectorAll('.nav-link').forEach(link => {
         link.classList.remove('active');
     });
-    document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+    const activeTab = document.querySelector(`[data-tab="${tabName}"]`);
+    if (activeTab) {
+        activeTab.classList.add('active');
+    }
 
-    // Показываем соответствующий контент
-    document.querySelectorAll('.tab-content').forEach(tab => {
-        tab.classList.remove('active');
+    // Скрываем все вкладки (и tab-content, и tab-section)
+    document.querySelectorAll('.tab-content').forEach(section => {
+        section.classList.remove('active');
+        section.style.display = 'none';
     });
-    document.getElementById(`${tabName}-tab`).classList.add('active');
+    document.querySelectorAll('.tab-section').forEach(section => {
+        section.style.display = 'none';
+    });
+    
+    // Показываем нужную вкладку
+    let targetSection;
+    if (tabName === 'home') {
+        targetSection = document.getElementById('home-tab');
+    } else if (tabName === 'create') {
+        targetSection = document.getElementById('create-tab');
+    } else if (tabName === 'profile') {
+        targetSection = document.getElementById('profile');
+    }
+    
+    if (targetSection) {
+        targetSection.classList.add('active');
+        targetSection.style.display = 'block';
+    }
 
-    // Загружаем данные для главной страницы
+    // Загружаем данные в зависимости от вкладки
     if (tabName === 'home') {
         loadUserTickets();
+    } else if (tabName === 'profile') {
+        loadProfileData();
     }
 }
 
@@ -86,7 +301,7 @@ async function loadUserTickets() {
             ...currentFilters
         });
 
-        const response = await fetch(`${API_BASE_URL}/tickets/?${params}`);
+        const response = await authorizedFetch(`${API_BASE_URL}/tickets/?${params}`);
         
         if (!response.ok) {
             throw new Error('Ошибка загрузки тикетов');
@@ -209,12 +424,9 @@ async function handleTicketSubmit(e) {
             reporter_email: document.getElementById('reporterEmail').value
         };
 
-        const response = await fetch(`${API_BASE_URL}/tickets/`, {
+        const response = await authorizedFetch(`${API_BASE_URL}/tickets/`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(formData)
+            body: JSON.stringify(ticketData)
         });
 
         if (!response.ok) {
@@ -315,7 +527,7 @@ async function openTicketModal(ticketId) {
     try {
         showLoading(true);
         
-        const response = await fetch(`${API_BASE_URL}/tickets/${ticketId}`);
+        const response = await authorizedFetch(`${API_BASE_URL}/tickets/${ticketId}`);
         if (!response.ok) {
             throw new Error('Тикет не найден');
         }
