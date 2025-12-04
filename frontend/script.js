@@ -1398,6 +1398,11 @@ async function updateTicketPriority(ticketId) {
             throw new Error(`Ошибка обновления приоритета: ${errorText}`);
         }
         
+        const updatedTicket = await response.json();
+        
+        // Обновляем отображение приоритета в чате
+        updateChatPriorityDisplay(priority);
+        
         showNotification('Приоритет тикета обновлен!', 'success');
         
         // Обновляем списки тикетов
@@ -1445,4 +1450,29 @@ async function closeTicket(ticketId) {
         showNotification('Ошибка при закрытии тикета: ' + error.message, 'error');
         console.error('Error closing ticket:', error);
     }
+}
+
+// Обновляет отображение приоритета в интерфейсе чата
+function updateChatPriorityDisplay(newPriority) {
+    // Обновляем значение в выпадающем списке
+    const chatPrioritySelect = document.getElementById('chatPriority');
+    if (chatPrioritySelect) {
+        chatPrioritySelect.value = newPriority;
+    }
+    
+    // Обновляем отображение в деталях тикета
+    const ticketDetails = document.getElementById('supportTicketDetails');
+    if (ticketDetails) {
+        const priorityBadge = ticketDetails.querySelector('.priority-badge');
+        if (priorityBadge) {
+            // Удаляем старые классы приоритета
+            priorityBadge.classList.remove('priority-низкий', 'priority-средний', 'priority-высокий', 'priority-критический');
+            // Добавляем новый класс
+            priorityBadge.classList.add(`priority-${newPriority}`);
+            // Обновляем текст
+            priorityBadge.textContent = getPriorityText(newPriority);
+        }
+    }
+    
+    console.log('Priority display updated to:', newPriority);
 }
