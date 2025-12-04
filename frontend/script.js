@@ -994,6 +994,8 @@ async function openSupportTicketModal(ticketId) {
         if (modal) {
             modal.style.display = 'block';
             modal.classList.add('active');
+            // Блокируем прокрутку фона
+            document.body.classList.add('modal-open');
             console.log('Модальное окно открыто для тикета:', ticketId);
         }
         
@@ -1085,9 +1087,33 @@ function setupChatEventListeners() {
     // Закрытие модального окна
     const closeBtn = document.getElementById('closeSupportModal');
     if (closeBtn) {
-        closeBtn.onclick = () => {
-            document.getElementById('supportTicketModal').classList.remove('active');
+        closeBtn.onclick = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const modal = document.getElementById('supportTicketModal');
+            if (modal) {
+                modal.classList.remove('active');
+                modal.style.display = 'none';
+                // Разблокируем прокрутку фона
+                document.body.classList.remove('modal-open');
+            }
             currentTicketId = null;
+            console.log('Модальное окно закрыто через крестик');
+        };
+    }
+    
+    // Закрытие по клику на фон
+    const modal = document.getElementById('supportTicketModal');
+    if (modal) {
+        modal.onclick = (e) => {
+            if (e.target === modal) {
+                modal.classList.remove('active');
+                modal.style.display = 'none';
+                // Разблокируем прокрутку фона
+                document.body.classList.remove('modal-open');
+                currentTicketId = null;
+                console.log('Модальное окно закрыто по клику на фон');
+            }
         };
     }
     
@@ -1475,6 +1501,8 @@ async function closeTicket(ticketId) {
             // Удаляем все классы и скрываем
             modal.classList.remove('active');
             modal.style.display = 'none';
+            // Разблокируем прокрутку фона
+            document.body.classList.remove('modal-open');
         }
         
         // Очищаем текущий тикет в самом конце
