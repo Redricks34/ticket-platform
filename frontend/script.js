@@ -458,7 +458,7 @@ async function handleTicketSubmit(e) {
 
         const ticket = await response.json();
         
-        showNotification('Тикет успешно создан!', 'success');
+        // Уведомление будет показано через WebSocket
         resetCreateForm();
         
         // Переключаемся на главную и обновляем список
