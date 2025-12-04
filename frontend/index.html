@@ -386,6 +386,34 @@
     <!-- Уведомления -->
     <div class="notifications" id="notifications"></div>
 
+    <!-- Модальное окно принятия тикета -->
+    <div id="acceptTicketModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Принятие тикета</h2>
+                <button class="close-btn" id="closeAcceptModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="acceptTicketDetails">
+                    <!-- Детали тикета будут загружены динамически -->
+                </div>
+                <div class="form-group">
+                    <label for="acceptPriority">Установить приоритет:</label>
+                    <select id="acceptPriority" class="form-control" required>
+                        <option value="низкий">Низкий</option>
+                        <option value="средний" selected>Средний</option>
+                        <option value="высокий">Высокий</option>
+                        <option value="критический">Критический</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelAccept">Отмена</button>
+                <button class="btn btn-primary" id="confirmAccept">Принять тикет</button>
+            </div>
+        </div>
+    </div>
+
     <!-- JavaScript -->
     <script src="script.js"></script>
 </body>

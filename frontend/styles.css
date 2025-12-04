@@ -1162,3 +1162,172 @@ body {
     margin-top: 5px;
     display: block;
 }
+
+/* Модальное окно принятия тикета */
+#acceptTicketModal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 10000;
+    justify-content: center;
+    align-items: center;
+}
+
+#acceptTicketModal .modal-content {
+    max-width: 600px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    position: relative;
+}
+
+#acceptTicketModal .modal-header {
+    position: relative;
+    padding: 20px 60px 20px 20px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+#acceptTicketModal .modal-header h2 {
+    margin: 0;
+    color: #1f2937;
+    font-size: 20px;
+    font-weight: 600;
+}
+
+#acceptTicketModal .modal-body {
+    padding: 20px;
+}
+
+.ticket-preview {
+    background: #f8fafc;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.ticket-preview h3 {
+    color: #1e293b;
+    margin-bottom: 15px;
+}
+
+.ticket-preview p {
+    margin-bottom: 8px;
+}
+
+.ticket-description {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid #e2e8f0;
+}
+
+.ticket-description p {
+    background: white;
+    padding: 12px;
+    border-radius: 6px;
+    border-left: 3px solid #667eea;
+    margin-top: 8px;
+}
+
+/* Управление тикетами в чате */
+.ticket-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.ticket-controls .form-group {
+    margin-bottom: 10px;
+}
+
+.ticket-controls .form-group label,
+#acceptTicketModal .form-group label {
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 5px;
+    display: block;
+}
+
+/* Стили для select в модальном окне */
+#acceptTicketModal .form-control,
+.ticket-controls .form-control {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    background: white;
+    font-size: 14px;
+    transition: border-color 0.2s;
+}
+
+#acceptTicketModal .form-control:focus,
+.ticket-controls .form-control:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+/* Стили для кнопки закрытия модального окна */
+#acceptTicketModal .close-btn {
+    position: absolute;
+    top: 15px;
+    right: 20px;
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: #6b7280;
+    cursor: pointer;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+#acceptTicketModal .close-btn:hover {
+    background: #f3f4f6;
+    color: #374151;
+}
+
+/* Стили для футера модального окна */
+#acceptTicketModal .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 20px;
+    border-top: 1px solid #e5e7eb;
+    background: #f9fafb;
+}
+
+.ticket-controls .ticket-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.ticket-controls .btn {
+    flex: 1;
+    min-width: 120px;
+}
+
+/* Стили кнопок в модальном окне */
+#acceptTicketModal .modal-footer .btn {
+    min-width: 100px;
+    padding: 10px 20px;
+}
+
+/* Адаптивность для управления тикетами */
+@media (max-width: 768px) {
+    .ticket-controls .ticket-actions {
+        flex-direction: column;
+    }
+    
+    .ticket-controls .btn {
+        width: 100%;
+    }
+}

@@ -184,12 +184,17 @@ async def create_ticket_message(ticket_id: str, message_data: dict):
         message = await message_service.create_message(ticket_id, message_create)
         
         # Отправляем уведомление через WebSocket
-        await notification_service.publish_ticket_event("message_added", {
-            "ticket_id": ticket_id,
-            "message": message.model_dump()
-        })
+        try:
+            message_dict = message.model_dump() if hasattr(message, 'model_dump') else message.__dict__
+            await notification_service.publish_ticket_event("message_added", {
+                "ticket_id": ticket_id,
+                "message": message_dict
+            })
+        except Exception as e:
+            # Игнорируем ошибки уведомлений, чтобы не блокировать создание сообщения
+            print(f"Ошибка отправки уведомления: {e}")
         
-        return message.model_dump()
+        return message.model_dump() if hasattr(message, 'model_dump') else message.__dict__
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -200,5 +205,63 @@ async def get_unread_messages_count(ticket_id: str, user_email: str):
         from message_service import message_service
         count = await message_service.get_unread_count(ticket_id, user_email)
         return {"count": count}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.patch("/{ticket_id}/priority")
+async def update_ticket_priority(ticket_id: str, priority_data: dict):
+    """Обновить приоритет тикета."""
+    try:
+        priority = priority_data.get("priority")
+        if not priority:
+            raise HTTPException(status_code=400, detail="Приоритет не указан")
+        
+        ticket = await TicketService.update_ticket(ticket_id, {"priority": priority})
+        if not ticket:
+            raise HTTPException(status_code=404, detail="Тикет не найден")
+        
+        # Возвращаем простой словарь вместо model_dump
+        return {
+            "id": ticket.id,
+            "title": ticket.title,
+            "description": ticket.description,
+            "status": ticket.status,
+            "priority": ticket.priority,
+            "category": ticket.category,
+            "reporter_email": ticket.reporter_email,
+            "reporter_name": ticket.reporter_name,
+            "assigned_to": ticket.assigned_to,
+            "created_at": ticket.created_at.isoformat() if ticket.created_at else None,
+            "updated_at": ticket.updated_at.isoformat() if ticket.updated_at else None
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.patch("/{ticket_id}/status")
+async def update_ticket_status(ticket_id: str, status_data: dict):
+    """Обновить статус тикета."""
+    try:
+        status = status_data.get("status")
+        if not status:
+            raise HTTPException(status_code=400, detail="Статус не указан")
+        
+        ticket = await TicketService.update_ticket(ticket_id, {"status": status})
+        if not ticket:
+            raise HTTPException(status_code=404, detail="Тикет не найден")
+        
+        # Возвращаем простой словарь вместо model_dump
+        return {
+            "id": ticket.id,
+            "title": ticket.title,
+            "description": ticket.description,
+            "status": ticket.status,
+            "priority": ticket.priority,
+            "category": ticket.category,
+            "reporter_email": ticket.reporter_email,
+            "reporter_name": ticket.reporter_name,
+            "assigned_to": ticket.assigned_to,
+            "created_at": ticket.created_at.isoformat() if ticket.created_at else None,
+            "updated_at": ticket.updated_at.isoformat() if ticket.updated_at else None
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

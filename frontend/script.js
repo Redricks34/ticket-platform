@@ -923,7 +923,7 @@ function renderSupportTickets(tickets, containerId, showAcceptButton = false) {
                 </div>
                 <div class="ticket-actions">
                     ${showAcceptButton ? `
-                        <button class="btn btn-primary btn-sm" onclick="acceptTicket('${ticket.id}')">
+                        <button class="btn btn-primary btn-sm" onclick="showAcceptTicketModal('${ticket.id}')">
                             <i class="fas fa-hand-paper"></i>
                             Принять
                         </button>
@@ -1030,6 +1030,9 @@ function renderSupportTicketModal(ticket, messages) {
     
     // Рендерим сообщения
     renderChatMessages(messages);
+    
+    // Добавляем управление тикетом
+    addTicketManagementToChat(ticket.id, ticket);
     
     // Настраиваем обработчики
     setupChatEventListeners();
@@ -1190,15 +1193,256 @@ function getCategoryText(category) {
 function getPriorityText(priority) {
     const priorityTexts = {
         'низкий': 'Низкий',
-        'средний': 'Средний',
+        'средний': 'Средний', 
         'высокий': 'Высокий',
-        'критический': 'Критический'
+        'критический': 'Критический',
+        'не определён': 'Не определён',
+        'не_определён': 'Не определён'
     };
-    return priorityTexts[priority] || priority;
+    return priorityTexts[priority] || 'Не определён';
 }
 
 function updateUserInfo() {
     // В реальной системе здесь будет информация из авторизации
     const userName = localStorage.getItem('userName') || 'Пользователь';
     document.querySelector('.user-name').textContent = userName;
+}
+
+// Модальное окно принятия тикета
+let currentAcceptTicketId = null;
+
+function showAcceptTicketModal(ticketId) {
+    currentAcceptTicketId = ticketId;
+    
+    // Загружаем данные тикета
+    loadTicketForAccept(ticketId);
+    
+    // Показываем модальное окно
+    const modal = document.getElementById('acceptTicketModal');
+    modal.style.display = 'flex';
+    
+    // Настраиваем обработчики
+    document.getElementById('closeAcceptModal').onclick = closeAcceptModal;
+    document.getElementById('cancelAccept').onclick = closeAcceptModal;
+    document.getElementById('confirmAccept').onclick = confirmAcceptTicket;
+}
+
+function closeAcceptModal() {
+    const modal = document.getElementById('acceptTicketModal');
+    modal.style.display = 'none';
+    currentAcceptTicketId = null;
+}
+
+async function loadTicketForAccept(ticketId) {
+    try {
+        const response = await authorizedFetch(`${API_BASE_URL}/tickets/${ticketId}`);
+        if (!response.ok) {
+            throw new Error('Ошибка загрузки тикета');
+        }
+        
+        const ticket = await response.json();
+        
+        const detailsHTML = `
+            <div class="ticket-preview">
+                <h3>${ticket.title}</h3>
+                <p><strong>ID:</strong> #${ticket.id.substring(0, 8)}</p>
+                <p><strong>Статус:</strong> ${getStatusText(ticket.status)}</p>
+                <p><strong>Текущий приоритет:</strong> ${getPriorityText(ticket.priority)}</p>
+                <p><strong>Автор:</strong> ${ticket.reporter_name}</p>
+                <p><strong>Создан:</strong> ${new Date(ticket.created_at).toLocaleString()}</p>
+                <div class="ticket-description">
+                    <strong>Описание:</strong>
+                    <p>${ticket.description}</p>
+                </div>
+            </div>
+        `;
+        
+        document.getElementById('acceptTicketDetails').innerHTML = detailsHTML;
+    } catch (error) {
+        showNotification('Ошибка загрузки данных тикета', 'error');
+        console.error('Error loading ticket:', error);
+    }
+}
+
+async function confirmAcceptTicket() {
+    if (!currentAcceptTicketId) return;
+    
+    const priority = document.getElementById('acceptPriority').value;
+    console.log('Accepting ticket:', currentAcceptTicketId, 'with priority:', priority);
+    
+    try {
+        // Принимаем тикет
+        console.log('Sending assign request to:', `${API_BASE_URL}/support/tickets/${currentAcceptTicketId}/assign`);
+        const assignResponse = await authorizedFetch(`${API_BASE_URL}/support/tickets/${currentAcceptTicketId}/assign`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        console.log('Assign response status:', assignResponse.status);
+        
+        if (!assignResponse.ok) {
+            const errorText = await assignResponse.text();
+            console.error('Assign error response:', errorText);
+            throw new Error(`Ошибка принятия тикета: ${errorText}`);
+        }
+        
+        const assignResult = await assignResponse.json();
+        console.log('Ticket assigned successfully:', assignResult);
+        
+        // Обновляем приоритет
+        console.log('Updating priority to:', priority);
+        const priorityResponse = await authorizedFetch(`${API_BASE_URL}/tickets/${currentAcceptTicketId}`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ priority: priority })
+        });
+        
+        console.log('Priority response status:', priorityResponse.status);
+        
+        if (!priorityResponse.ok) {
+            const priorityErrorText = await priorityResponse.text();
+            console.warn('Не удалось обновить приоритет:', priorityErrorText);
+            showNotification('Тикет принят, но не удалось обновить приоритет', 'warning');
+        } else {
+            console.log('Priority updated successfully');
+        }
+        
+        showNotification('Тикет успешно принят!', 'success');
+        closeAcceptModal();
+        
+        // Обновляем список тикетов
+        console.log('Refreshing ticket lists...');
+        await Promise.all([
+            loadUnassignedTickets(),
+            loadAssignedTickets()
+        ]);
+        console.log('Ticket lists refreshed');
+        
+    } catch (error) {
+        console.error('Error accepting ticket:', error);
+        showNotification('Ошибка при принятии тикета: ' + error.message, 'error');
+    }
+}
+
+// Добавляем кнопки управления в чат
+function addTicketManagementToChat(ticketId, ticket) {
+    const chatModal = document.getElementById('supportTicketModal');
+    if (!chatModal) {
+        console.error('Support ticket modal not found');
+        return;
+    }
+    
+    const existingControls = chatModal.querySelector('.ticket-controls');
+    
+    if (!existingControls) {
+        const controlsHTML = `
+            <div class="ticket-controls" style="padding: 15px; border-top: 1px solid #e2e8f0; background: #f8fafc;">
+                <div class="form-group">
+                    <label for="chatPriority">Приоритет:</label>
+                    <select id="chatPriority" class="form-control" style="margin-bottom: 10px;">
+                        <option value="низкий" ${ticket.priority === 'низкий' ? 'selected' : ''}>Низкий</option>
+                        <option value="средний" ${ticket.priority === 'средний' ? 'selected' : ''}>Средний</option>
+                        <option value="высокий" ${ticket.priority === 'высокий' ? 'selected' : ''}>Высокий</option>
+                        <option value="критический" ${ticket.priority === 'критический' ? 'selected' : ''}>Критический</option>
+                    </select>
+                </div>
+                <div class="ticket-actions">
+                    <button class="btn btn-primary btn-sm" onclick="updateTicketPriority('${ticketId}')">
+                        <i class="fas fa-save"></i>
+                        Обновить приоритет
+                    </button>
+                    <button class="btn btn-success btn-sm" onclick="closeTicket('${ticketId}')">
+                        <i class="fas fa-check"></i>
+                        Закрыть тикет
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        // Ищем правильный контейнер для вставки
+        const chatInputContainer = chatModal.querySelector('.chat-input-container');
+        const supportModalBody = chatModal.querySelector('.support-modal-body');
+        
+        if (chatInputContainer) {
+            chatInputContainer.insertAdjacentHTML('afterend', controlsHTML);
+            console.log('Ticket controls added after chat input container');
+        } else if (supportModalBody) {
+            supportModalBody.insertAdjacentHTML('beforeend', controlsHTML);
+            console.log('Ticket controls added to modal body');
+        } else {
+            console.error('No suitable container found for ticket controls');
+        }
+    }
+}
+
+async function updateTicketPriority(ticketId) {
+    const priority = document.getElementById('chatPriority').value;
+    
+    try {
+        console.log('Обновляем приоритет тикета:', ticketId, 'на:', priority);
+        
+        const response = await authorizedFetch(`${API_BASE_URL}/tickets/${ticketId}`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ priority: priority })
+        });
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Ошибка обновления приоритета: ${errorText}`);
+        }
+        
+        showNotification('Приоритет тикета обновлен!', 'success');
+        
+        // Обновляем списки тикетов
+        await loadUnassignedTickets();
+        await loadAssignedTickets();
+        
+    } catch (error) {
+        showNotification('Ошибка при обновлении приоритета: ' + error.message, 'error');
+        console.error('Error updating priority:', error);
+    }
+}
+
+async function closeTicket(ticketId) {
+    if (!confirm('Вы уверены, что хотите закрыть этот тикет?')) {
+        return;
+    }
+    
+    try {
+        console.log('Закрываем тикет:', ticketId);
+        
+        const response = await authorizedFetch(`${API_BASE_URL}/tickets/${ticketId}`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ status: 'закрыт' })
+        });
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Ошибка закрытия тикета: ${errorText}`);
+        }
+        
+        showNotification('Тикет успешно закрыт!', 'success');
+        
+        // Закрываем модальное окно чата
+        document.getElementById('supportTicketModal').style.display = 'none';
+        document.getElementById('supportTicketModal').classList.remove('active');
+        
+        // Обновляем списки тикетов
+        await loadUnassignedTickets();
+        await loadAssignedTickets();
+        
+    } catch (error) {
+        showNotification('Ошибка при закрытии тикета: ' + error.message, 'error');
+        console.error('Error closing ticket:', error);
+    }
 }
