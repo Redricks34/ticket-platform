@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ticket Platform - Система техподдержки</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fas fa-ticket-alt"></i>
+                    <span>Ticket Platform</span>
+                </div>
+                <nav class="nav">
+                    <ul class="nav-list">
+                        <li class="nav-item">
+                            <a href="#" class="nav-link active" data-tab="home">
+                                <i class="fas fa-home"></i>
+                                Мои тикеты
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="#" class="nav-link" data-tab="create">
+                                <i class="fas fa-plus-circle"></i>
+                                Создать тикет
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
+                <div class="user-info">
+                    <div class="user-avatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <span class="user-name">Пользователь</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+        <div class="container">
+            <!-- Главная страница с тикетами пользователя -->
+            <section id="home-tab" class="tab-content active">
+                <div class="page-header">
+                    <h1>Мои тикеты</h1>
+                    <div class="filters">
+                        <select id="statusFilter" class="filter-select">
+                            <option value="">Все статусы</option>
+                            <option value="открыт">Открыт</option>
+                            <option value="в_процессе">В процессе</option>
+                            <option value="решен">Решен</option>
+                            <option value="закрыт">Закрыт</option>
+                        </select>
+                        <select id="categoryFilter" class="filter-select">
+                            <option value="">Все категории</option>
+                            <option value="техническая">Техническая</option>
+                            <option value="биллинг">Биллинг</option>
+                            <option value="общий">Общий</option>
+                            <option value="баг_репорт">Баг репорт</option>
+                            <option value="запрос_функции">Запрос функции</option>
+                        </select>
+                        <input type="text" id="searchInput" class="search-input" placeholder="Поиск по тикетам...">
+                    </div>
+                </div>
+
+                <!-- Статистика -->
+                <div class="stats">
+                    <div class="stat-card">
+                        <div class="stat-icon open">
+                            <i class="fas fa-folder-open"></i>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-number" id="openTickets">0</span>
+                            <span class="stat-label">Открытые</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon progress">
+                            <i class="fas fa-cog"></i>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-number" id="progressTickets">0</span>
+                            <span class="stat-label">В процессе</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon resolved">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-number" id="resolvedTickets">0</span>
+                            <span class="stat-label">Решенные</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon total">
+                            <i class="fas fa-list"></i>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-number" id="totalTickets">0</span>
+                            <span class="stat-label">Всего</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Список тикетов -->
+                <div class="tickets-grid" id="ticketsGrid">
+                    <!-- Тикеты будут загружены динамически -->
+                </div>
+
+                <!-- Загрузка -->
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <span>Загрузка тикетов...</span>
+                </div>
+
+                <!-- Пагинация -->
+                <div class="pagination" id="pagination">
+                    <!-- Пагинация будет создана динамически -->
+                </div>
+            </section>
+
+            <!-- Страница создания тикета -->
+            <section id="create-tab" class="tab-content">
+                <div class="page-header">
+                    <h1>Создать новый тикет</h1>
+                    <p class="page-subtitle">Опишите вашу проблему или вопрос, и наша служба поддержки вам поможет</p>
+                </div>
+
+                <form class="create-ticket-form" id="createTicketForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="ticketTitle" class="form-label">
+                                <i class="fas fa-heading"></i>
+                                Заголовок тикета *
+                            </label>
+                            <input 
+                                type="text" 
+                                id="ticketTitle" 
+                                class="form-input" 
+                                placeholder="Краткое описание проблемы"
+                                required
+                                maxlength="200"
+                            >
+                            <div class="input-hint">Максимум 200 символов</div>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="ticketCategory" class="form-label">
+                                <i class="fas fa-tag"></i>
+                                Категория *
+                            </label>
+                            <select id="ticketCategory" class="form-select" required>
+                                <option value="">Выберите категорию</option>
+                                <option value="техническая">Техническая проблема</option>
+                                <option value="биллинг">Вопросы по биллингу</option>
+                                <option value="общий">Общий вопрос</option>
+                                <option value="баг_репорт">Сообщить о баге</option>
+                                <option value="запрос_функции">Запрос новой функции</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="ticketDescription" class="form-label">
+                                <i class="fas fa-align-left"></i>
+                                Подробное описание *
+                            </label>
+                            <textarea 
+                                id="ticketDescription" 
+                                class="form-textarea" 
+                                placeholder="Подробно опишите проблему: что случилось, когда это началось, какие шаги вы предпринимали..."
+                                required
+                                maxlength="2000"
+                                rows="8"
+                            ></textarea>
+                            <div class="input-hint">Максимум 2000 символов. Чем детальнее описание, тем быстрее мы сможем помочь.</div>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group half">
+                            <label for="reporterName" class="form-label">
+                                <i class="fas fa-user"></i>
+                                Ваше имя *
+                            </label>
+                            <input 
+                                type="text" 
+                                id="reporterName" 
+                                class="form-input" 
+                                placeholder="Введите ваше имя"
+                                required
+                                maxlength="100"
+                            >
+                        </div>
+                        <div class="form-group half">
+                            <label for="reporterEmail" class="form-label">
+                                <i class="fas fa-envelope"></i>
+                                Email для связи *
+                            </label>
+                            <input 
+                                type="email" 
+                                id="reporterEmail" 
+                                class="form-input" 
+                                placeholder="your@email.com"
+                                required
+                            >
+                        </div>
+                    </div>
+
+                    <div class="priority-info">
+                        <i class="fas fa-info-circle"></i>
+                        <span>Приоритет тикета будет определен автоматически службой поддержки на основе описания проблемы.</span>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" id="resetForm">
+                            <i class="fas fa-undo"></i>
+                            Очистить
+                        </button>
+                        <button type="submit" class="btn btn-primary" id="submitTicket">
+                            <i class="fas fa-paper-plane"></i>
+                            Создать тикет
+                        </button>
+                    </div>
+                </form>
+            </section>
+        </div>
+    </main>
+
+    <!-- Модальное окно для просмотра тикета -->
+    <div class="modal" id="ticketModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTicketTitle">Заголовок тикета</h2>
+                <button class="modal-close" id="closeModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body" id="modalTicketBody">
+                <!-- Содержимое тикета будет загружено динамически -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Уведомления -->
+    <div class="notifications" id="notifications"></div>
+
+    <!-- JavaScript -->
+    <script src="script.js"></script>
+</body>
+</html>
