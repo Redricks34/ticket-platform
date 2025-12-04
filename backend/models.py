@@ -12,6 +12,7 @@ class TicketStatus(str, Enum):
     RESOLVED = "решен"
 
 class TicketPriority(str, Enum):
+    UNDEFINED = "не определён"
     LOW = "низкий"
     MEDIUM = "средний"
     HIGH = "высокий"
@@ -27,7 +28,7 @@ class TicketCategory(str, Enum):
 class TicketBase(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
     description: str = Field(..., min_length=1, max_length=2000)
-    priority: TicketPriority = TicketPriority.MEDIUM
+    priority: TicketPriority = TicketPriority.UNDEFINED
     category: TicketCategory = TicketCategory.GENERAL
     reporter_email: str = Field(..., min_length=1)
     reporter_name: str = Field(..., min_length=1, max_length=100)

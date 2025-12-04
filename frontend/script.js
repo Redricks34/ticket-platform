@@ -214,6 +214,11 @@ function setupEventListeners() {
         categoryFilter.addEventListener('change', applyFilters);
     }
     
+    const priorityFilter = document.getElementById('priorityFilter');
+    if (priorityFilter) {
+        priorityFilter.addEventListener('change', applyFilters);
+    }
+    
     const searchInput = document.getElementById('searchInput');
     if (searchInput) {
         searchInput.addEventListener('input', debounce(applyFilters, 500));
@@ -493,12 +498,14 @@ function resetCreateForm() {
 function applyFilters() {
     const statusFilter = document.getElementById('statusFilter').value;
     const categoryFilter = document.getElementById('categoryFilter').value;
+    const priorityFilter = document.getElementById('priorityFilter').value;
     const searchInput = document.getElementById('searchInput').value;
 
     currentFilters = {};
     
     if (statusFilter) currentFilters.status = statusFilter;
     if (categoryFilter) currentFilters.category = categoryFilter;
+    if (priorityFilter) currentFilters.priority = priorityFilter;
     if (searchInput.trim()) currentFilters.search_text = searchInput.trim();
 
     currentPage = 1; // Сбрасываем на первую страницу
