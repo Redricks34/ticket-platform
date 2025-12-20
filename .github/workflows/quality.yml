@@ -1,0 +1,63 @@
+name: Code Quality Check
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+  push:
+    branches: [ develop ]
+
+jobs:
+  code-quality:
+    name: Проверка качества кода
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+    
+    - name: 🐍 Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+    
+    - name: 📦 Install linting tools
+      run: |
+        pip install flake8 pylint black isort mypy
+        pip install -r backend/requirements.txt
+    
+    - name: 🎨 Check code formatting with Black
+      run: |
+        cd backend
+        black --check --diff .
+      continue-on-error: true
+    
+    - name: 📐 Check import sorting with isort
+      run: |
+        cd backend
+        isort --check-only --diff .
+      continue-on-error: true
+    
+    - name: 🔍 Lint with flake8
+      run: |
+        cd backend
+        flake8 . --count --statistics --max-line-length=127
+      continue-on-error: true
+    
+    - name: 🔎 Lint with pylint
+      run: |
+        cd backend
+        pylint **/*.py --exit-zero
+      continue-on-error: true
+    
+    - name: 🔒 Type check with mypy
+      run: |
+        cd backend
+        mypy . --ignore-missing-imports
+      continue-on-error: true
+    
+    - name: 📊 Generate report
+      if: always()
+      run: |
+        echo "### Code Quality Report 📊" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "✅ Проверка завершена" >> $GITHUB_STEP_SUMMARY
